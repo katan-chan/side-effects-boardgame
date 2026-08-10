@@ -12,6 +12,7 @@ import { GameCard } from './cards/GameCard'
 import { CardBack } from './cards/CardBack'
 import { OpponentAvatarBar } from './OpponentAvatarBar'
 import { GameLogDrawer } from './GameLogDrawer'
+import { GhostLayer, triggerGhost } from './GhostLayer'
 
 type BoardCard =
   | Pick<
@@ -90,6 +91,7 @@ export function Psyche({
         return (
           <button
             type="button"
+            id={`slot-${slot.disorder.instanceId}`}
             className={slotClass}
             key={slot.disorder.instanceId}
             onClick={(event) => {
@@ -196,12 +198,13 @@ export function GameBoard(props: GameBoardProps) {
     if (!selectedCard || isLocked || !isViewerTurn) return
 
     if (selectedCard.cardType === 'drug' && ownerId === viewer.id) {
+      triggerGhost(`hand-card-${selectedCard.instanceId}`, `slot-${slotId}`, selectedCard)
       executeCommand(() => props.onPlayDrug(selectedCard.instanceId, slotId))
     } else if (selectedCard.cardType === 'therapy' && ownerId === viewer.id) {
+      triggerGhost(`hand-card-${selectedCard.instanceId}`, `slot-${slotId}`, selectedCard)
       executeCommand(() => props.onPlayTherapy(selectedCard.instanceId, slotId))
     } else if (selectedCard.cardType === 'episode' && ownerId !== viewer.id) {
-      // Pending decisions (anxiety/tremors) are handled by server, we just send the play Episode command.
-      // The server will transition to a pending decision state if needed.
+      triggerGhost(`hand-card-${selectedCard.instanceId}`, `slot-${slotId}`, selectedCard)
       executeCommand(() => props.onPlayEpisode(selectedCard.instanceId, ownerId, slotId))
     }
   }
@@ -213,6 +216,7 @@ export function GameBoard(props: GameBoardProps) {
     }
 
     if (selectedCard.cardType === 'disorder') {
+      triggerGhost(`hand-card-${selectedCard.instanceId}`, `avatar-${opponentId}`, selectedCard)
       executeCommand(() => props.onPlayDisorder(selectedCard.instanceId, opponentId))
     } else {
       setFocusedOpponentId(opponentId)
@@ -265,12 +269,17 @@ export function GameBoard(props: GameBoardProps) {
         )}
       </section>
 
-      <section className="center-zone">
+      <section className="center-zone" id="center-table">
         <div className="deck-area">
-          <button type="button" className="draw-pile" style={{ padding: 0, background: 'none', border: 'none' }} onClick={() => !isLocked && props.onDraw()} disabled={!isViewerTurn || game.turn.phase !== 'draw'}>
+          <button id="deck-draw" type="button" className="draw-pile" style={{ padding: 0, background: 'none', border: 'none' }} onClick={() => {
+            if (!isLocked) {
+              triggerGhost('deck-draw', 'own-hand', undefined, 'cardback')
+              props.onDraw()
+            }
+          }} disabled={!isViewerTurn || game.turn.phase !== 'draw'}>
             <CardBack label={t('drawPile')} count={drawPileCount} />
           </button>
-          <div className="discard-pile">
+          <div id="deck-discard" className="discard-pile">
             <CardBack label={t('discardPile')} count={discardPileCount} />
           </div>
         </div>
@@ -303,18 +312,19 @@ export function GameBoard(props: GameBoardProps) {
         </article>
         
         <div className="hand-and-controls">
-          <section className="hand own-hand">
+          <section className="hand own-hand" id="own-hand">
             <div className="cards">
               {viewerHand.map((card) => (
-                <CardButton
-                  card={card}
-                  key={card.instanceId}
-                  selected={card.instanceId === selectedCardId}
-                  onClick={() => {
-                    if (selectedCardId === card.instanceId) setSelectedCardId(undefined)
-                    else setSelectedCardId(card.instanceId)
-                  }}
-                />
+                <div id={`hand-card-${card.instanceId}`} key={card.instanceId}>
+                  <CardButton
+                    card={card}
+                    selected={card.instanceId === selectedCardId}
+                    onClick={() => {
+                      if (selectedCardId === card.instanceId) setSelectedCardId(undefined)
+                      else setSelectedCardId(card.instanceId)
+                    }}
+                  />
+                </div>
               ))}
             </div>
           </section>
@@ -323,7 +333,10 @@ export function GameBoard(props: GameBoardProps) {
             {isTargetingMode && game.turn.phase === 'discard' && (
               <button type="button" className="primary action-btn" onClick={() => {
                 const currentId = selectedCardId
-                if (currentId) executeCommand(() => props.onDiscard(currentId))
+                if (currentId) {
+                  triggerGhost(`hand-card-${currentId}`, 'deck-discard', selectedCard)
+                  executeCommand(() => props.onDiscard(currentId))
+                }
               }}>
                 {t('discardSelected')}
               </button>
@@ -344,6 +357,7 @@ export function GameBoard(props: GameBoardProps) {
       </section>
 
       <GameLogDrawer gameLog={props.gameLog} showLog={showLog} setShowLog={setShowLog} />
+      <GhostLayer />
     </main>
   )
 }

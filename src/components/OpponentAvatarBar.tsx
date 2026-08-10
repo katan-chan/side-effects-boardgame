@@ -29,6 +29,7 @@ export function OpponentAvatarBar({
         return (
           <button
             key={opponent.id}
+            id={`avatar-${opponent.id}`}
             type="button"
             className={`opponent-avatar ${isFocused ? 'focused' : ''} ${isTargeted ? 'targeted' : ''} ${opponent.id === currentPlayerId ? 'current-turn' : ''}`}
             onClick={() => setFocusedOpponentId(opponent.id)}
