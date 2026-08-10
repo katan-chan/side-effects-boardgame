@@ -174,6 +174,7 @@ export function GameBoard(props: GameBoardProps) {
     disorder: BoardCard
     drug?: BoardCard
   }>()
+  const [showLog, setShowLog] = useState(false)
   const selectedCard = viewerHand.find(
     (card) => card.instanceId === selectedCardId,
   )
@@ -221,57 +222,9 @@ export function GameBoard(props: GameBoardProps) {
         </button>
       )
     if (game.turn.phase !== 'play') return <p>{t('drawBeforePlay')}</p>
-    if (selectedCard.cardType === 'drug')
-      return (
-        <>
-          <p>{t('ownUntreatedDisorder')}</p>
-          <button
-            type="button"
-            className="primary"
-            disabled={!targetDisorderId}
-            onClick={() => {
-              if (targetDisorderId)
-                props.onPlayDrug(selectedCard.instanceId, targetDisorderId)
-            }}
-          >
-            {t('playDrug')}
-          </button>
-        </>
-      )
-    if (selectedCard.cardType === 'therapy')
-      return (
-        <>
-          <p>{t('ownUntreatedDisorder')}</p>
-          <button
-            type="button"
-            className="primary"
-            disabled={!targetDisorderId}
-            onClick={() => {
-              if (targetDisorderId)
-                props.onPlayTherapy(selectedCard.instanceId, targetDisorderId)
-            }}
-          >
-            {t('playTherapy')}
-          </button>
-        </>
-      )
-    if (selectedCard.cardType === 'disorder')
-      return (
-        <>
-          <p>{t('selectOpponent')}</p>
-          <button
-            type="button"
-            className="primary"
-            disabled={!targetPlayerId}
-            onClick={() => {
-              if (targetPlayerId)
-                props.onPlayDisorder(selectedCard.instanceId, targetPlayerId)
-            }}
-          >
-            {t('playDisorder')}
-          </button>
-        </>
-      )
+    if (selectedCard.cardType === 'drug') return <p>{t('ownUntreatedDisorder')}</p>
+    if (selectedCard.cardType === 'therapy') return <p>{t('ownUntreatedDisorder')}</p>
+    if (selectedCard.cardType === 'disorder') return <p>{t('selectOpponent')}</p>
     const targetDisorder = untreatedTarget.find(
       (slot) => slot.disorder.instanceId === targetDisorderId,
     )
@@ -396,8 +349,10 @@ export function GameBoard(props: GameBoardProps) {
                 selectedCard &&
                 player.id !== viewer.id &&
                 selectedCard.cardType === 'disorder'
-              )
-                selectPlayer(player.id)
+              ) {
+                props.onPlayDisorder(selectedCard.instanceId, player.id)
+                resetChoice()
+              }
             }}
           >
             <h2 data-initial={player.name.slice(0, 1).toUpperCase()}>{player.name}</h2>
@@ -439,13 +394,28 @@ export function GameBoard(props: GameBoardProps) {
                   selectEpisodeTarget(ownerId, slotId, (playerId, disorderId) => {
                     selectPlayer(playerId)
                     setTargetDisorderId(disorderId)
+                    const targetSlot = slotsOf(player).find(
+                      (candidate) => candidate.disorder.instanceId === disorderId,
+                    )
+                    const effectId = targetSlot?.disorder.definitionId
+                    if (effectId !== 'anxiety' && effectId !== 'tremors') {
+                      props.onPlayEpisode(selectedCard.instanceId, playerId, disorderId)
+                      resetChoice()
+                    }
                   })
                 if (
                   (selectedCard.cardType === 'drug' || selectedCard.cardType === 'therapy') &&
                   ownerId !== viewer.id
                 )
                   return
-                if (selectedCard.cardType !== 'episode') setTargetDisorderId(slotId)
+                if (selectedCard.cardType === 'drug') {
+                  props.onPlayDrug(selectedCard.instanceId, slotId)
+                  resetChoice()
+                }
+                if (selectedCard.cardType === 'therapy') {
+                  props.onPlayTherapy(selectedCard.instanceId, slotId)
+                  resetChoice()
+                }
               }}
               onInspect={(slot) => setInspectedSlot(slot)}
             />
@@ -496,14 +466,17 @@ export function GameBoard(props: GameBoardProps) {
           </button>
         )}
       </section>
-      <section className="game-log panel">
-        <h2>{t('gameLog')}</h2>
+      <button className="log-toggle" type="button" onClick={() => setShowLog(true)}>
+        {t('gameLog')}
+      </button>
+      {showLog && <section className="game-log panel" role="dialog">
+        <header><h2>{t('gameLog')}</h2><button type="button" onClick={() => setShowLog(false)}>{t('close')}</button></header>
         <ol>
           {props.gameLog.slice(-10).map((entry, index) => (
             <li key={`${entry}-${index}`}>{entry}</li>
           ))}
         </ol>
-      </section>
+      </section>}
       <footer className="button-row action-bar">
         <button
           type="button"
