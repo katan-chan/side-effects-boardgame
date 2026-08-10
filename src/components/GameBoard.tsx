@@ -27,6 +27,14 @@ export function selectPsycheSlot(
   onSelect?.(slotId)
 }
 
+export function selectEpisodeTarget(
+  playerId: string,
+  disorderId: string,
+  onSelect: (playerId: string, disorderId: string) => void,
+): void {
+  onSelect(playerId, disorderId)
+}
+
 function slotsOf(
   player: BoardPlayer,
 ): (PlayerState['psyche']['slots'][number] | PublicPsycheSlotView)[] {
@@ -58,24 +66,30 @@ interface GameBoardProps {
 
 function Psyche({
   player,
+  playerId,
   selectedId,
   onSelect,
+  canSelect,
 }: {
   player: BoardPlayer
+  playerId: string
   selectedId?: string
-  onSelect?: (slotId: string) => void
+  onSelect?: (playerId: string, slotId: string) => void
+  canSelect?: (slot: ReturnType<typeof slotsOf>[number]) => boolean
 }) {
   return (
     <div className="psyche">
       {slotsOf(player).map((slot) => (
         <button
           type="button"
-          className={`slot ${selectedId === slot.disorder.instanceId ? 'target-selected' : ''} ${onSelect ? 'targetable' : ''}`}
+          className={`slot ${selectedId === slot.disorder.instanceId ? 'target-selected' : ''} ${canSelect?.(slot) ? 'targetable' : ''}`}
           key={slot.disorder.instanceId}
-          onClick={(event) =>
-            // Player panels are also selectable Episode targets; a slot click must not reset it.
-            selectPsycheSlot(event, slot.disorder.instanceId, onSelect)
-          }
+          onClick={(event) => {
+            // Never let a nested slot click trigger its player-panel handler.
+            event.stopPropagation()
+            if (canSelect?.(slot))
+              onSelect?.(playerId, slot.disorder.instanceId)
+          }}
         >
           <strong>{cardName(slot.disorder.definitionId, slot.disorder.displayName)}</strong>
           <span className={slot.drug ? 'treated' : 'untreated'}>
@@ -236,12 +250,13 @@ export function GameBoard(props: GameBoardProps) {
     return (
       <>
         <p>
-          {targetDisorder
-            ? t('selectedDisorder', {
+          {targetDisorder && target
+            ? t('selectedDisorderPlayer', {
                 disorder: cardName(
                   targetDisorder.disorder.definitionId,
                   targetDisorder.disorder.displayName,
                 ),
+                player: target.name,
               })
             : target
               ? t('targetUntreatedDisorder')
@@ -340,13 +355,13 @@ export function GameBoard(props: GameBoardProps) {
       <section className="players">
         {game.players.map((player) => (
           <article
-            className={`player panel ${player.id === current.id ? 'current-player' : ''} ${player.id === viewer.id ? 'viewer-player' : ''} ${selectedCard && player.id !== viewer.id && (selectedCard.cardType === 'disorder' || selectedCard.cardType === 'episode') ? 'targetable player-target' : ''} ${targetPlayerId === player.id ? 'target-selected' : ''}`}
+            className={`player panel ${player.id === current.id ? 'current-player' : ''} ${player.id === viewer.id ? 'viewer-player' : ''} ${selectedCard?.cardType === 'disorder' && player.id !== viewer.id ? 'targetable player-target' : ''} ${targetPlayerId === player.id ? 'target-selected' : ''}`}
             key={player.id}
             onClick={() => {
               if (
                 selectedCard &&
                 player.id !== viewer.id &&
-                (selectedCard.cardType === 'disorder' || selectedCard.cardType === 'episode')
+                selectedCard.cardType === 'disorder'
               )
                 selectPlayer(player.id)
             }}
@@ -368,6 +383,7 @@ export function GameBoard(props: GameBoardProps) {
             )}
             <Psyche
               player={player}
+              playerId={player.id}
               selectedId={
                 (selectedCard?.cardType === 'drug' || selectedCard?.cardType === 'therapy') && player.id === viewer.id
                   ? targetDisorderId
@@ -375,13 +391,28 @@ export function GameBoard(props: GameBoardProps) {
                     ? targetDisorderId
                     : undefined
               }
-              onSelect={
-                (selectedCard?.cardType === 'drug' || selectedCard?.cardType === 'therapy') && player.id === viewer.id
-                  ? setTargetDisorderId
-                  : selectedCard?.cardType === 'episode' && player.id === targetPlayerId
-                    ? setTargetDisorderId
-                    : undefined
+              canSelect={(slot) =>
+                !slot.drug &&
+                ((selectedCard?.cardType === 'drug' || selectedCard?.cardType === 'therapy')
+                  ? player.id === viewer.id
+                  : selectedCard?.cardType === 'episode'
+                    ? player.id !== viewer.id
+                    : false)
               }
+              onSelect={(ownerId, slotId) => {
+                if (!selectedCard) return
+                if (selectedCard.cardType === 'episode')
+                  selectEpisodeTarget(ownerId, slotId, (playerId, disorderId) => {
+                    selectPlayer(playerId)
+                    setTargetDisorderId(disorderId)
+                  })
+                if (
+                  (selectedCard.cardType === 'drug' || selectedCard.cardType === 'therapy') &&
+                  ownerId !== viewer.id
+                )
+                  return
+                if (selectedCard.cardType !== 'episode') setTargetDisorderId(slotId)
+              }}
             />
           </article>
         ))}

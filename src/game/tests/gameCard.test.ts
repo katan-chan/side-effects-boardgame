@@ -18,8 +18,22 @@ function render(
 describe('card information presentation', () => {
   it('renders a Drug treatment and localized Side Effects from domain metadata', () => {
     const html = render('tremors-treatment', 'drug', 'Pramipexole')
-    expect(html).toContain('Điều trị: Run rẩy')
-    expect(html).toContain('Nghiện cờ bạc, Trầm cảm, Loạn trí')
+    expect(html).toContain('Điều trị')
+    expect(html).toContain('Run rẩy')
+    expect(html).toContain('Nghiện cờ bạc')
+    expect(html).toContain('Trầm cảm')
+    expect(html).toContain('Loạn trí')
+  })
+
+  it('shows named compact Side Effects instead of a numeric count', () => {
+    const html = render('depression-treatment', 'drug', 'Fluoxetine', false)
+    expect(html).toContain('Rối loạn cương dương')
+    expect(html).toContain('Ý nghĩ tự sát')
+    expect(html).toContain('+1')
+    expect(html).not.toContain('Có thể gây: 3')
+    expect(render('depression-treatment', 'drug', 'Fluoxetine')).toContain(
+      'Chán ăn tâm thần',
+    )
   })
 
   it('renders a Disorder Episode description and action-card instructions', () => {

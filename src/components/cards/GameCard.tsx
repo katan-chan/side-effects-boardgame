@@ -31,14 +31,22 @@ export function GameCard({
       )}
       {definition?.cardType === 'drug' && (
         <>
-          <span className="card-summary">
-            {t('treatLabel')}: {disorderName(definition.treats)}
-          </span>
-          <span className="card-summary">
-            {t('mayCause')}: {expanded
-              ? definition.sideEffects.map(disorderName).join(', ')
-              : definition.sideEffects.length}
-          </span>
+          <small className="card-label">{t('treatLabel')}</small>
+          <span className="card-summary">{disorderName(definition.treats)}</span>
+          <small className="card-label">{t('sideEffects')}</small>
+          <div className="side-effect-list">
+            {(expanded
+              ? definition.sideEffects
+              : definition.sideEffects.slice(0, 2)
+            ).map((effect) => (
+              <span className="side-effect-chip" key={effect}>
+                {disorderName(effect)}
+              </span>
+            ))}
+            {!expanded && definition.sideEffects.length > 2 && (
+              <span className="side-effect-chip">+{definition.sideEffects.length - 2}</span>
+            )}
+          </div>
         </>
       )}
       {definition?.cardType === 'episode' && (
