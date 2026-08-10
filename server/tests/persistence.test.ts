@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { hasCardConservation } from '../../src/game/engine/invariants'
 import { InMemoryRoomRepository } from '../persistence/inMemoryRoomRepository'
 import { deserializeRoom, serializeRoom } from '../persistence/serializer'
@@ -134,5 +134,39 @@ describe('room persistence', () => {
 
     expect(repository.saved).toHaveLength(2)
     expect(repository.saved.at(-1)?.room.players).toHaveLength(2)
+  })
+
+  it('keeps the in-memory room live after a failed save and retries later mutations', async () => {
+    class FlakyRepository implements RoomRepository {
+      attempts = 0
+      saved: PersistedRoomSnapshot[] = []
+
+      async save(snapshot: PersistedRoomSnapshot): Promise<void> {
+        this.attempts += 1
+        if (this.attempts === 1) throw new Error('temporary persistence outage')
+        this.saved.push(structuredClone(snapshot))
+      }
+
+      async loadActive(): Promise<PersistedRoomSnapshot[]> {
+        return []
+      }
+    }
+
+    const repository = new FlakyRepository()
+    const logError = vi.fn()
+    const service = new RoomService(repository, logError)
+    const { room } = service.createRoom('Ada', 'ada-id')
+    await service.flushPersistence(room.id)
+
+    expect(service.getRoom(room.id)?.players).toHaveLength(1)
+    expect(logError).toHaveBeenCalledWith(
+      'Room persistence failed; the in-memory game remains active.',
+    )
+
+    service.joinRoom(room.id, 'ben-id', 'Ben')
+    await service.flushPersistence(room.id)
+
+    expect(repository.saved).toHaveLength(1)
+    expect(repository.saved[0].room.players).toHaveLength(2)
   })
 })

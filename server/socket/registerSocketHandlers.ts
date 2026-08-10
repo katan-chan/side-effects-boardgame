@@ -9,6 +9,114 @@ interface Session {
   playerId: string
 }
 
+type UnknownRecord = Record<string, unknown>
+
+function requireRecord(payload: unknown): UnknownRecord {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload))
+    throw new Error('Invalid request payload.')
+  return payload as UnknownRecord
+}
+
+function requireString(payload: UnknownRecord, key: string): string {
+  const value = payload[key]
+  if (typeof value !== 'string' || !value.trim())
+    throw new Error(`Invalid ${key}.`)
+  return value
+}
+
+export function parseRoomCreatePayload(payload: unknown): {
+  displayName: string
+  playerId: string
+} {
+  const record = requireRecord(payload)
+  return {
+    displayName: requireString(record, 'displayName'),
+    playerId: requireString(record, 'playerId'),
+  }
+}
+
+export function parseRoomJoinPayload(payload: unknown): {
+  roomId: string
+  playerId: string
+  displayName: string
+} {
+  const record = requireRecord(payload)
+  return {
+    roomId: requireString(record, 'roomId'),
+    playerId: requireString(record, 'playerId'),
+    displayName: requireString(record, 'displayName'),
+  }
+}
+
+export function parseSessionPayload(payload: unknown): Session {
+  const record = requireRecord(payload)
+  return {
+    roomId: requireString(record, 'roomId'),
+    playerId: requireString(record, 'playerId'),
+  }
+}
+
+/**
+ * Accept only command identifiers. Episode effect options are created by the
+ * authoritative pending-decision flow, never trusted from a client payload.
+ */
+export function parseGameCommandPayload(payload: unknown): GameCommand {
+  const record = requireRecord(payload)
+  switch (requireString(record, 'type')) {
+    case 'draw':
+      return { type: 'draw' }
+    case 'endTurn':
+      return { type: 'endTurn' }
+    case 'playDrug':
+      return {
+        type: 'playDrug',
+        drugCardId: requireString(record, 'drugCardId'),
+        disorderCardId: requireString(record, 'disorderCardId'),
+      }
+    case 'playDisorder':
+      return {
+        type: 'playDisorder',
+        disorderCardId: requireString(record, 'disorderCardId'),
+        targetPlayerId: requireString(record, 'targetPlayerId'),
+      }
+    case 'playEpisode':
+      return {
+        type: 'playEpisode',
+        episodeCardId: requireString(record, 'episodeCardId'),
+        targetPlayerId: requireString(record, 'targetPlayerId'),
+        targetDisorderCardId: requireString(record, 'targetDisorderCardId'),
+      }
+    case 'playTherapy':
+      return {
+        type: 'playTherapy',
+        therapyCardId: requireString(record, 'therapyCardId'),
+        disorderCardId: requireString(record, 'disorderCardId'),
+      }
+    case 'discard':
+      return { type: 'discard', cardInstanceId: requireString(record, 'cardInstanceId') }
+    default:
+      throw new Error('Unknown game command.')
+  }
+}
+
+export function parseDecisionPayload(payload: unknown): {
+  decisionId: string
+  choiceIds: string[]
+} {
+  const record = requireRecord(payload)
+  const choiceIds = record.choiceIds
+  if (
+    !Array.isArray(choiceIds) ||
+    choiceIds.length > 3 ||
+    choiceIds.some((choiceId) => typeof choiceId !== 'string' || !choiceId.trim())
+  )
+    throw new Error('Invalid pending card choices.')
+  return {
+    decisionId: requireString(record, 'decisionId'),
+    choiceIds,
+  }
+}
+
 export function registerSocketHandlers(io: Server, rooms: RoomService): void {
   const sessions = new Map<string, Session>()
 
@@ -49,16 +157,9 @@ export function registerSocketHandlers(io: Server, rooms: RoomService): void {
   }
 
   io.on('connection', (socket) => {
-    socket.on(
-      'room:create',
-      ({
-        displayName,
-        playerId,
-      }: {
-        displayName: string
-        playerId: string
-      }) => {
+    socket.on('room:create', (payload: unknown) => {
         try {
+          const { displayName, playerId } = parseRoomCreatePayload(payload)
           const { room, player } = rooms.createRoom(
             displayName,
             playerId,
@@ -74,21 +175,11 @@ export function registerSocketHandlers(io: Server, rooms: RoomService): void {
         } catch (error) {
           fail(socket, error)
         }
-      },
-    )
+      })
 
-    socket.on(
-      'room:join',
-      ({
-        roomId,
-        playerId,
-        displayName,
-      }: {
-        roomId: string
-        playerId: string
-        displayName: string
-      }) => {
+    socket.on('room:join', (payload: unknown) => {
         try {
+          const { roomId, playerId, displayName } = parseRoomJoinPayload(payload)
           const room = rooms.joinRoom(roomId, playerId, displayName, socket.id)
           sessions.set(socket.id, { roomId, playerId })
           socket.join(roomId)
@@ -97,11 +188,11 @@ export function registerSocketHandlers(io: Server, rooms: RoomService): void {
         } catch (error) {
           fail(socket, error)
         }
-      },
-    )
+      })
 
-    socket.on('session:resume', ({ roomId, playerId }: Session) => {
+    socket.on('session:resume', (payload: unknown) => {
       try {
+        const { roomId, playerId } = parseSessionPayload(payload)
         const room = rooms.resumeSession(roomId, playerId, socket.id)
         sessions.set(socket.id, { roomId, playerId })
         socket.join(roomId)
@@ -124,9 +215,10 @@ export function registerSocketHandlers(io: Server, rooms: RoomService): void {
       }
     })
 
-    socket.on('game:command', (command: GameCommand) => {
+    socket.on('game:command', (payload: unknown) => {
       try {
         const session = activeSession(socket)
+        const command = parseGameCommandPayload(payload)
         rooms.executeCommand(session.roomId, session.playerId, command)
         const room = rooms.getRoom(session.roomId)!
         broadcastRoom(room)
@@ -136,17 +228,10 @@ export function registerSocketHandlers(io: Server, rooms: RoomService): void {
       }
     })
 
-    socket.on(
-      'game:decision',
-      ({
-        decisionId,
-        choiceIds,
-      }: {
-        decisionId: string
-        choiceIds: string[]
-        }) => {
+    socket.on('game:decision', (payload: unknown) => {
         try {
           const session = activeSession(socket)
+          const { decisionId, choiceIds } = parseDecisionPayload(payload)
           rooms.resolveDecision(
             session.roomId,
             session.playerId,
@@ -159,8 +244,7 @@ export function registerSocketHandlers(io: Server, rooms: RoomService): void {
         } catch (error) {
           fail(socket, error)
         }
-      },
-    )
+      })
 
     socket.on('disconnect', () => {
       const session = sessions.get(socket.id)

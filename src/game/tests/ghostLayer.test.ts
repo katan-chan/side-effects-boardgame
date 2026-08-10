@@ -11,13 +11,13 @@ describe('triggerGhost', () => {
       matchMedia: vi.fn().mockImplementation(() => ({
         matches: false,
       })),
-    } as any
+    } as unknown as Window & typeof globalThis
 
     // Mock document
     global.document = {
       createElement: () => ({ getBoundingClientRect: vi.fn(), remove: vi.fn() }),
       getElementById: vi.fn(),
-    } as any
+    } as unknown as Document
   })
 
   it('snapshots source and destination geometry before mutation', () => {
@@ -66,7 +66,7 @@ describe('triggerGhost', () => {
       matches: true,
     }))
 
-    const mockEl = { getBoundingClientRect: vi.fn() } as any
+    const mockEl = { getBoundingClientRect: vi.fn() } as unknown as HTMLElement
     vi.spyOn(document, 'getElementById').mockReturnValue(mockEl)
 
     let called = false
