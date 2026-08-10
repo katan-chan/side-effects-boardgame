@@ -97,6 +97,7 @@ export function describeCommand(
       )
       return t('logEpisode', {
         player: actorPlayerName,
+        card: em(handCardName(actor, command.episodeCardId)),
         disorder: em(psycheDisorderName(target, command.targetDisorderCardId)),
         target: em(target?.name ?? t('unknownPlayer')),
       })
@@ -104,6 +105,7 @@ export function describeCommand(
     case 'playTherapy':
       return t('logTherapy', {
         player: actorPlayerName,
+        card: em(handCardName(actor, command.therapyCardId)),
         disorder: em(psycheDisorderName(actor, command.disorderCardId)),
       })
     case 'discard':

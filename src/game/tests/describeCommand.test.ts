@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GameCommand } from '../../../server/game/commands'
-import { disorderName, t } from '../../i18n'
+import { cardName, disorderName, t } from '../../i18n'
 import type {
   CardInstance,
   DisorderDefinition,
@@ -196,17 +196,31 @@ describe('describeCommand', () => {
     expect(line).toContain('**Bob**')
   })
 
-  it('names the removed disorder for playTherapy', () => {
+  it('names the therapy card and the removed disorder for playTherapy', () => {
     const before = baseGame()
     const line = describeCommand(before, commandsByType.playTherapy, before)
+    expect(line).toContain(cardName('therapy', 'Therapy'))
     expect(line).toContain(disorderName('madness'))
   })
 
-  it("names the target's disorder and the target player for playEpisode", () => {
+  it('emphasises the therapy card for playTherapy', () => {
+    const before = baseGame()
+    const line = describeCommand(before, commandsByType.playTherapy, before)
+    expect(line).toContain(`**${cardName('therapy', 'Therapy')}**`)
+  })
+
+  it("names the episode card, the target's disorder, and the target player for playEpisode", () => {
     const before = baseGame()
     const line = describeCommand(before, commandsByType.playEpisode, before)
+    expect(line).toContain(cardName('episode', 'Episode'))
     expect(line).toContain(disorderName('gambling-addiction'))
     expect(line).toContain('Bob')
+  })
+
+  it('emphasises the episode card for playEpisode', () => {
+    const before = baseGame()
+    const line = describeCommand(before, commandsByType.playEpisode, before)
+    expect(line).toContain(`**${cardName('episode', 'Episode')}**`)
   })
 
   it('names the discarded card for discard and discardManual', () => {
