@@ -7,7 +7,8 @@ import type {
   PublicCardView,
   PublicPsycheSlotView,
 } from '../../server/game/playerView'
-import { cardName, cardTypeName, localizeError, phaseName, t } from '../i18n'
+import { cardName, localizeError, phaseName, t } from '../i18n'
+import { GameCard } from './cards/GameCard'
 
 type BoardCard =
   | Pick<
@@ -90,8 +91,7 @@ function CardButton({
       className={`card card-${card.cardType} ${selected ? 'selected' : ''}`}
       onClick={onClick}
     >
-      <small>{cardTypeName(card.cardType)}</small>
-      {cardName(card.definitionId, card.displayName)}
+      <GameCard card={card} />
     </button>
   )
 }
@@ -375,6 +375,11 @@ export function GameBoard(props: GameBoardProps) {
             />
           ))}
         </div>
+        {selectedCard && (
+          <section className="card-detail" aria-live="polite">
+            <GameCard card={selectedCard} expanded />
+          </section>
+        )}
         <div className="action-panel">{actionPanel}</div>
         {selectedCard && (
           <button type="button" className="cancel-selection" onClick={resetChoice}>
