@@ -23,7 +23,9 @@ const createSeededGame = (playerCount: number) =>
 
 const allCards = (game: ReturnType<typeof createGame>) => [
   ...game.players.flatMap((player) => [
-    ...player.psyche.disorders,
+    ...player.psyche.slots.flatMap((slot) =>
+      slot.drug ? [slot.disorder, slot.drug] : [slot.disorder],
+    ),
     ...player.hand,
   ]),
   ...game.drawPile,
@@ -42,9 +44,9 @@ describe('base game setup', () => {
       const game = createSeededGame(playerCount)
 
       for (const player of game.players) {
-        expect(player.psyche.disorders).toHaveLength(disordersPerPlayer)
+        expect(player.psyche.slots).toHaveLength(disordersPerPlayer)
         expect(
-          new Set(player.psyche.disorders.map((card) => card.definitionId))
+          new Set(player.psyche.slots.map((slot) => slot.disorder.definitionId))
             .size,
         ).toBe(disordersPerPlayer)
       }

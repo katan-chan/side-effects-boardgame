@@ -15,13 +15,14 @@ const disorder = (
 const drug = (
   definitionId: DrugDefinition['definitionId'],
   displayName: string,
-  treatsDisorderId: DrugDefinition['treatsDisorderId'],
+  treats: DrugDefinition['treats'],
+  sideEffects: DrugDefinition['sideEffects'],
 ): DrugDefinition => ({
   definitionId,
   displayName,
   cardType: 'drug',
-  treatsDisorderId,
-  sideEffects: [],
+  treats,
+  sideEffects,
 })
 
 export const baseDeckEntries: readonly DeckEntry[] = [
@@ -41,43 +42,57 @@ export const baseDeckEntries: readonly DeckEntry[] = [
   { definition: disorder('madness', 'Madness', true), copies: 4 },
 
   {
-    definition: drug(
-      'depression-treatment',
-      'Depression Treatment',
+    definition: drug('depression-treatment', 'Fluoxetine', 'depression', [
+      'impotence',
+      'suicidal-thoughts',
+      'anorexia',
+    ]),
+    copies: 5,
+  },
+  {
+    definition: drug('anxiety-treatment', 'Lorazepam', 'anxiety', [
+      'suicidal-thoughts',
       'depression',
-    ),
+      'madness',
+    ]),
     copies: 5,
   },
   {
-    definition: drug('anxiety-treatment', 'Anxiety Treatment', 'anxiety'),
-    copies: 5,
-  },
-  {
-    definition: drug('impotence-treatment', 'Impotence Treatment', 'impotence'),
+    definition: drug('impotence-treatment', 'Sildenafil', 'impotence', [
+      'anxiety',
+    ]),
     copies: 5,
   },
   {
     definition: drug(
       'gambling-addiction-treatment',
-      'Gambling Addiction Treatment',
+      'Lithium',
       'gambling-addiction',
+      ['impotence'],
     ),
     copies: 5,
   },
   {
     definition: drug(
       'suicidal-thoughts-treatment',
-      'Suicidal Thoughts Treatment',
+      'Clozapine',
       'suicidal-thoughts',
+      ['madness'],
     ),
     copies: 5,
   },
   {
-    definition: drug('tremors-treatment', 'Tremors Treatment', 'tremors'),
+    definition: drug('tremors-treatment', 'Pramipexole', 'tremors', [
+      'gambling-addiction',
+      'depression',
+      'madness',
+    ]),
     copies: 6,
   },
   {
-    definition: drug('madness-treatment', 'Madness Treatment', 'madness'),
+    definition: drug('madness-treatment', 'Chlorpromazine', 'madness', [
+      'tremors',
+    ]),
     copies: 5,
   },
 

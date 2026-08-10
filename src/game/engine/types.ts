@@ -1,7 +1,16 @@
-import type { CardInstance, DisorderDefinition } from '../cards/types'
+import type {
+  CardInstance,
+  DisorderDefinition,
+  DrugDefinition,
+} from '../cards/types'
+
+export interface PsycheSlot {
+  disorder: CardInstance<DisorderDefinition>
+  drug?: CardInstance<DrugDefinition>
+}
 
 export interface PsycheState {
-  disorders: CardInstance<DisorderDefinition>[]
+  slots: PsycheSlot[]
 }
 
 export interface PlayerState {
@@ -14,6 +23,9 @@ export interface PlayerState {
 export interface TurnState {
   number: number
   currentPlayerId: string
+  phase: 'draw' | 'play' | 'discard'
+  cardsPlayedThisTurn: number
+  cardsDrawnThisTurn: number
 }
 
 export interface GameState {

@@ -101,7 +101,7 @@ export function createGame(
     id: `player-${index + 1}`,
     name: name.trim(),
     hand: [],
-    psyche: { disorders: psyches[index] },
+    psyche: { slots: psyches[index].map((disorder) => ({ disorder })) },
   }))
   const { players, drawPile } = dealHands(
     playersWithoutHands,
@@ -117,7 +117,13 @@ export function createGame(
     currentPlayerIndex,
     currentPlayerId,
     turnNumber: 1,
-    turn: { number: 1, currentPlayerId },
+    turn: {
+      number: 1,
+      currentPlayerId,
+      phase: 'draw',
+      cardsPlayedThisTurn: 0,
+      cardsDrawnThisTurn: 0,
+    },
     status: 'playing',
   }
 }

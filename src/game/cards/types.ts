@@ -31,9 +31,9 @@ export interface DisorderDefinition extends CardDefinitionBase {
 export interface DrugDefinition extends CardDefinitionBase {
   cardType: 'drug'
   definitionId: DrugId
-  treatsDisorderId: TreatableByDrugDisorderId
-  /** Named effects only; their execution deliberately belongs to future gameplay. */
-  sideEffects: readonly string[]
+  treats: TreatableByDrugDisorderId
+  /** TODO: Populate only when the official Side Effects data is available. */
+  sideEffects: readonly DisorderId[]
 }
 
 export interface EpisodeDefinition extends CardDefinitionBase {
