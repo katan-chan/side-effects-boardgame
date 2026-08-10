@@ -291,7 +291,7 @@ export function GameBoard(props: GameBoardProps) {
             Về phòng
           </button>
         )}
-        <button
+        {game.players.length === 2 && <button
           type="button"
           className="btn-danger top-action-btn"
           disabled={!isViewerTurn || game.status !== 'playing' || isLocked}
@@ -300,7 +300,7 @@ export function GameBoard(props: GameBoardProps) {
           }}
         >
           Xin thua
-        </button>
+        </button>}
         <button className="log-icon-btn top-action-icon" type="button" onClick={() => { audioManager.play('click'); setShowLog(!showLog) }} aria-label={t('gameLog')}>
           📜
         </button>
