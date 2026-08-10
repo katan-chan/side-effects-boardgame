@@ -24,6 +24,7 @@ export const vi: Translation = {
     selectedDisorder: 'Đã chọn: {disorder}',
     selectedDisorderPlayer: 'Đã chọn: {disorder} — {player}',
     sideEffects: 'Tác dụng phụ',
+    sideEffectCount: '{count} tác dụng phụ', psycheDetail: 'Chi tiết Tâm trí', close: 'Đóng', treatedBy: 'Điều trị bởi',
     episodeEffect: 'Cơn phát bệnh', episodeInstructions: 'Chọn một Rối loạn chưa được điều trị của người chơi khác và kích hoạt hiệu ứng Cơn phát bệnh của nó.', therapyInstructions: 'Loại bỏ một Rối loạn chưa được điều trị khỏi Tâm trí của bạn.', therapyRestriction: 'Không thể dùng lên Run rẩy. Chán ăn tâm thần chỉ có thể được điều trị bằng Trị liệu.',
     logLocalStarted: 'Ván chơi cùng máy đã bắt đầu.', logDrew: '{player} đã rút {count} lá.', logDrug: '{player} đã điều trị một Rối loạn.', logDisorder: '{player} đã gây một Rối loạn cho đối thủ.', logEpisode: '{player} đã kích hoạt một Cơn phát bệnh.', logTherapy: '{player} đã dùng Trị liệu.', logDiscard: '{player} đã bỏ một lá bài.', logEndTurn: '{player} đã kết thúc lượt.',
   },

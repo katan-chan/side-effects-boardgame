@@ -41,6 +41,7 @@ button:disabled { cursor: not-allowed; opacity: .42; }
 .slot { position: relative; display: grid; gap: .2rem; min-height: 0; padding: .55rem .6rem; border: 1px solid #4d6a64; border-left: 4px solid #de765f; border-radius: .7rem; background: linear-gradient(135deg, #0a1d1b, #20191b); text-align: left; }
 .slot:has(.treated) { border-left-color: #76d8c5; }
 .slot strong { display: flex; align-items: center; gap: .35rem; font-size: .83rem; line-height: 1.2; }.disorder-icon { display: inline-grid; place-items: center; width: 1.2rem; height: 1.2rem; border-radius: 50%; color: #ffb3a3; background: #602c2a; font-size: .8rem; flex: 0 0 auto; }
+.slot-summary { color: #c1d7d2; font-size: .66rem; }.psyche-detail { display: grid; gap: .7rem; max-width: 38rem; }.psyche-detail > header { display: flex; justify-content: space-between; align-items: center; }.treated-by { display: grid; gap: .4rem; }.treated-by > small { color: #b9d8d1; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
 .slot small { color: #a4f0dd; font-weight: 700; }
 .treated, .untreated { width: max-content; font-size: .68rem; letter-spacing: .06em; text-transform: uppercase; font-weight: 900; padding: .18rem .4rem; border-radius: 99px; }
 .treated { color: #07372f; background: #82e6d2; }

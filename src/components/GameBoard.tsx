@@ -11,6 +11,7 @@ import { cardName, localizeError, phaseName, t } from '../i18n'
 import { GameCard } from './cards/GameCard'
 import { CardBack } from './cards/CardBack'
 import { DisorderIcon } from './cards/DisorderIcon'
+import { getCardDefinition } from '../game/cards/catalog'
 
 type BoardCard =
   | Pick<
@@ -72,16 +73,26 @@ function Psyche({
   selectedId,
   onSelect,
   canSelect,
+  onInspect,
 }: {
   player: BoardPlayer
   playerId: string
   selectedId?: string
   onSelect?: (playerId: string, slotId: string) => void
   canSelect?: (slot: ReturnType<typeof slotsOf>[number]) => boolean
+  onInspect?: (slot: ReturnType<typeof slotsOf>[number]) => void
 }) {
   return (
     <div className="psyche">
-      {slotsOf(player).map((slot) => (
+      {slotsOf(player).map((slot) => {
+        const drugDefinition = slot.drug
+          ? getCardDefinition(slot.drug.definitionId)
+          : undefined
+        const sideEffectCount =
+          drugDefinition?.cardType === 'drug'
+            ? drugDefinition.sideEffects.length
+            : 0
+        return (
         <button
           type="button"
           className={`slot ${selectedId === slot.disorder.instanceId ? 'target-selected' : ''} ${canSelect?.(slot) ? 'targetable' : ''}`}
@@ -91,6 +102,7 @@ function Psyche({
             event.stopPropagation()
             if (canSelect?.(slot))
               onSelect?.(playerId, slot.disorder.instanceId)
+            else onInspect?.(slot)
           }}
         >
           <strong><DisorderIcon id={slot.disorder.definitionId as DisorderId} />{cardName(slot.disorder.definitionId, slot.disorder.displayName)}</strong>
@@ -98,8 +110,16 @@ function Psyche({
             {slot.drug ? t('treated') : t('untreated')}
           </span>
           {slot.drug && <small>{cardName(slot.drug.definitionId, slot.drug.displayName)}</small>}
+          {slot.drug && (
+            <small className="slot-summary">
+              {t('sideEffectCount', {
+                count: sideEffectCount,
+              })}
+            </small>
+          )}
         </button>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -142,6 +162,10 @@ export function GameBoard(props: GameBoardProps) {
   const [targetDisorderId, setTargetDisorderId] = useState<string>()
   const [chosenCardId, setChosenCardId] = useState<string>()
   const [tremorsIds, setTremorsIds] = useState<string[]>([])
+  const [inspectedSlot, setInspectedSlot] = useState<{
+    disorder: BoardCard
+    drug?: BoardCard
+  }>()
   const selectedCard = viewerHand.find(
     (card) => card.instanceId === selectedCardId,
   )
@@ -415,10 +439,31 @@ export function GameBoard(props: GameBoardProps) {
                   return
                 if (selectedCard.cardType !== 'episode') setTargetDisorderId(slotId)
               }}
+              onInspect={(slot) => setInspectedSlot(slot)}
             />
           </article>
         ))}
       </section>
+      {inspectedSlot && (
+        <section className="psyche-detail panel" aria-live="polite">
+          <header>
+            <strong>{t('psycheDetail')}</strong>
+            <button type="button" onClick={() => setInspectedSlot(undefined)}>
+              {t('close')}
+            </button>
+          </header>
+          <span className={inspectedSlot.drug ? 'treated' : 'untreated'}>
+            {inspectedSlot.drug ? t('treated') : t('untreated')}
+          </span>
+          <GameCard card={inspectedSlot.disorder} expanded />
+          {inspectedSlot.drug && (
+            <section className="treated-by">
+              <small>{t('treatedBy')}</small>
+              <GameCard card={inspectedSlot.drug} expanded />
+            </section>
+          )}
+        </section>
+      )}
       <section className="hand panel own-hand">
         <h2>{t('hand')} — {viewer.name}</h2>
         <div className="cards">
