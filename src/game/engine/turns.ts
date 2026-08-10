@@ -1,5 +1,6 @@
 import type { CardInstance } from '../cards/types'
 import { shuffle, systemRandom, type RandomSource } from './random'
+import { cannotPlayCards } from './temporaryEffects'
 import type { GameState, PlayerState, TurnState } from './types'
 
 const CARDS_PER_TURN = 2
@@ -31,24 +32,96 @@ function replaceCurrentPlayer(
   )
 }
 
-function advanceTurn(game: GameState): GameState {
-  const currentPlayerIndex = (game.currentPlayerIndex + 1) % game.players.length
-  const currentPlayerId = game.players[currentPlayerIndex].id
-  const turnNumber = game.turnNumber + 1
-
+function updatePlayer(
+  game: GameState,
+  playerIndex: number,
+  player: PlayerState,
+): GameState {
   return {
     ...game,
+    players: game.players.map((candidate, index) =>
+      index === playerIndex ? player : candidate,
+    ),
+  }
+}
+
+function beginTurn(
+  game: GameState,
+  currentPlayerIndex: number,
+  turnNumber: number,
+): GameState {
+  let nextGame: GameState = {
+    ...game,
     currentPlayerIndex,
-    currentPlayerId,
+    currentPlayerId: game.players[currentPlayerIndex].id,
     turnNumber,
     turn: {
       number: turnNumber,
-      currentPlayerId,
+      currentPlayerId: game.players[currentPlayerIndex].id,
       phase: 'draw',
       cardsPlayedThisTurn: 0,
       cardsDrawnThisTurn: 0,
     },
   }
+
+  for (
+    let skippedPlayers = 0;
+    skippedPlayers < nextGame.players.length;
+    skippedPlayers += 1
+  ) {
+    const player = nextGame.players[nextGame.currentPlayerIndex]
+    if (player.effects.skipTurns === 0) {
+      if (player.effects.skipDrawTurns > 0) {
+        nextGame = updatePlayer(nextGame, nextGame.currentPlayerIndex, {
+          ...player,
+          effects: {
+            ...player.effects,
+            skipDrawTurns: player.effects.skipDrawTurns - 1,
+          },
+        })
+        return { ...nextGame, turn: { ...nextGame.turn, phase: 'play' } }
+      }
+      return nextGame
+    }
+
+    nextGame = updatePlayer(nextGame, nextGame.currentPlayerIndex, {
+      ...player,
+      effects: { ...player.effects, skipTurns: player.effects.skipTurns - 1 },
+    })
+    const followingIndex =
+      (nextGame.currentPlayerIndex + 1) % nextGame.players.length
+    nextGame = {
+      ...nextGame,
+      currentPlayerIndex: followingIndex,
+      currentPlayerId: nextGame.players[followingIndex].id,
+      turnNumber: nextGame.turnNumber + 1,
+      turn: {
+        number: nextGame.turnNumber + 1,
+        currentPlayerId: nextGame.players[followingIndex].id,
+        phase: 'draw',
+        cardsPlayedThisTurn: 0,
+        cardsDrawnThisTurn: 0,
+      },
+    }
+  }
+
+  return nextGame
+}
+
+function advanceTurn(game: GameState): GameState {
+  const currentPlayer = game.players[game.currentPlayerIndex]
+  const afterCurrentEffects =
+    currentPlayer.effects.cannotPlayTurns > 0
+      ? updatePlayer(game, game.currentPlayerIndex, {
+          ...currentPlayer,
+          effects: {
+            ...currentPlayer.effects,
+            cannotPlayTurns: currentPlayer.effects.cannotPlayTurns - 1,
+          },
+        })
+      : game
+  const currentPlayerIndex = (game.currentPlayerIndex + 1) % game.players.length
+  return beginTurn(afterCurrentEffects, currentPlayerIndex, game.turnNumber + 1)
 }
 
 function drawAvailableCards(
@@ -89,7 +162,7 @@ export function startTurn(game: GameState): GameState {
     throw new Error('A turn can only start while the game is playing.')
   }
   assertPhase(game, 'draw')
-  return game
+  return beginTurn(game, game.currentPlayerIndex, game.turnNumber)
 }
 
 /** Draws up to the two cards required for this turn, recycling discards if needed. */
@@ -137,6 +210,10 @@ export function registerCardPlayed(
 ): GameState {
   assertCurrentPlayer(game, playerId)
   assertPhase(game, 'play')
+
+  if (cannotPlayCards(game.players[game.currentPlayerIndex])) {
+    throw new Error('The current player cannot play cards this turn.')
+  }
 
   if (game.turn.cardsPlayedThisTurn >= MAX_CARDS_PLAYED_PER_TURN) {
     throw new Error('A player may play at most two cards per turn.')

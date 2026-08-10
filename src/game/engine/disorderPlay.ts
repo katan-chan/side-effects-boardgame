@@ -1,4 +1,5 @@
 import { canReceiveDisorder } from './sideEffects'
+import { cannotPlayCards } from './temporaryEffects'
 import type { GameState } from './types'
 
 const MAX_CARDS_PLAYED_PER_TURN = 2
@@ -24,6 +25,9 @@ export function playDisorder(
   }
 
   const currentPlayer = game.players[game.currentPlayerIndex]
+  if (cannotPlayCards(currentPlayer)) {
+    throw new Error('The current player cannot play cards this turn.')
+  }
   const disorderIndex = currentPlayer.hand.findIndex(
     (card) => card.instanceId === disorderCardId,
   )

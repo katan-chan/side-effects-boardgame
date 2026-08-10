@@ -102,6 +102,7 @@ export function createGame(
     name: name.trim(),
     hand: [],
     psyche: { slots: psyches[index].map((disorder) => ({ disorder })) },
+    effects: { skipTurns: 0, cannotPlayTurns: 0, skipDrawTurns: 0 },
   }))
   const { players, drawPile } = dealHands(
     playersWithoutHands,

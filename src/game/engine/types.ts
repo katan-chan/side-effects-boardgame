@@ -13,11 +13,18 @@ export interface PsycheState {
   slots: PsycheSlot[]
 }
 
+export interface TemporaryEffectsState {
+  skipTurns: number
+  cannotPlayTurns: number
+  skipDrawTurns: number
+}
+
 export interface PlayerState {
   id: string
   name: string
   hand: CardInstance[]
   psyche: PsycheState
+  effects: TemporaryEffectsState
 }
 
 export interface TurnState {

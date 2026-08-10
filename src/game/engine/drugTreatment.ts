@@ -1,4 +1,5 @@
 import type { GameState, PlayerState } from './types'
+import { cannotPlayCards } from './temporaryEffects'
 
 const MAX_CARDS_PLAYED_PER_TURN = 2
 
@@ -29,6 +30,9 @@ export function playDrug(
   }
 
   const currentPlayer = game.players[game.currentPlayerIndex]
+  if (cannotPlayCards(currentPlayer)) {
+    throw new Error('The current player cannot play cards this turn.')
+  }
   const drugIndex = currentPlayer.hand.findIndex(
     (card) => card.instanceId === drugCardId,
   )
