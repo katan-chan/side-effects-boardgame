@@ -7,6 +7,7 @@ import type {
   PublicCardView,
   PublicPsycheSlotView,
 } from '../../server/game/playerView'
+import { cardName, cardTypeName, localizeError, phaseName, t } from '../i18n'
 
 type BoardCard =
   | Pick<
@@ -50,11 +51,11 @@ function Psyche({ player }: { player: BoardPlayer }) {
     <div className="psyche">
       {slotsOf(player).map((slot) => (
         <div className="slot" key={slot.disorder.instanceId}>
-          <strong>{slot.disorder.displayName}</strong>
+          <strong>{cardName(slot.disorder.definitionId, slot.disorder.displayName)}</strong>
           <span className={slot.drug ? 'treated' : 'untreated'}>
-            {slot.drug ? 'TREATED' : 'UNTREATED'}
+            {slot.drug ? t('treated') : t('untreated')}
           </span>
-          {slot.drug && <small>{slot.drug.displayName}</small>}
+          {slot.drug && <small>{cardName(slot.drug.definitionId, slot.drug.displayName)}</small>}
         </div>
       ))}
     </div>
@@ -76,8 +77,8 @@ function CardButton({
       className={`card ${selected ? 'selected' : ''}`}
       onClick={onClick}
     >
-      <small>{card.cardType}</small>
-      {card.displayName}
+      <small>{cardTypeName(card.cardType)}</small>
+      {cardName(card.definitionId, card.displayName)}
     </button>
   )
 }
@@ -117,7 +118,7 @@ export function GameBoard(props: GameBoardProps) {
   }
   const targetPlayerControl = (
     <label>
-      Target player
+      {t('targetPlayer')}
       <select
         value={targetPlayerId ?? ''}
         onChange={(event) => {
@@ -127,7 +128,7 @@ export function GameBoard(props: GameBoardProps) {
           setTremorsIds([])
         }}
       >
-        <option value="">Choose opponent</option>
+        <option value="">{t('selectOpponent')}</option>
         {game.players
           .filter((player) => player.id !== viewer.id)
           .map((player) => (
@@ -149,8 +150,8 @@ export function GameBoard(props: GameBoardProps) {
   }, [viewer.id, viewerHand, selectedCardId])
 
   const actionPanel = useMemo(() => {
-    if (!selectedCard) return <p>Select a card from your hand.</p>
-    if (!isViewerTurn) return <p>Waiting for {current.name}.</p>
+    if (!selectedCard) return <p>{t('selectCard')}</p>
+    if (!isViewerTurn) return <p>{t('waitingFor', { player: current.name })}</p>
     if (game.turn.phase === 'discard')
       return (
         <button
@@ -160,26 +161,26 @@ export function GameBoard(props: GameBoardProps) {
             props.onDiscard(selectedCard.instanceId)
           }}
         >
-          Discard selected card
+          {t('discardSelected')}
         </button>
       )
-    if (game.turn.phase !== 'play') return <p>Draw before playing cards.</p>
+    if (game.turn.phase !== 'play') return <p>{t('drawBeforePlay')}</p>
     const ownSelector = (
       <label>
-        Own untreated Disorder
+        {t('ownUntreatedDisorder')}
         <select
           value={targetDisorderId ?? ''}
           onChange={(event) =>
             setTargetDisorderId(event.target.value || undefined)
           }
         >
-          <option value="">Choose Disorder</option>
+          <option value="">{t('chooseDisorder')}</option>
           {untreatedOwn.map((slot) => (
             <option
               key={slot.disorder.instanceId}
               value={slot.disorder.instanceId}
             >
-              {slot.disorder.displayName}
+              {cardName(slot.disorder.definitionId, slot.disorder.displayName)}
             </option>
           ))}
         </select>
@@ -198,7 +199,7 @@ export function GameBoard(props: GameBoardProps) {
                 props.onPlayDrug(selectedCard.instanceId, targetDisorderId)
             }}
           >
-            Play Drug
+            {t('playDrug')}
           </button>
         </>
       )
@@ -215,7 +216,7 @@ export function GameBoard(props: GameBoardProps) {
                 props.onPlayTherapy(selectedCard.instanceId, targetDisorderId)
             }}
           >
-            Play Therapy
+            {t('playTherapy')}
           </button>
         </>
       )
@@ -232,7 +233,7 @@ export function GameBoard(props: GameBoardProps) {
                 props.onPlayDisorder(selectedCard.instanceId, targetPlayerId)
             }}
           >
-            Play Disorder
+            {t('playDisorder')}
           </button>
         </>
       )
@@ -250,7 +251,7 @@ export function GameBoard(props: GameBoardProps) {
         {targetPlayerControl}
         {target && (
           <label>
-            Untreated target Disorder
+            {t('targetUntreatedDisorder')}
             <select
               value={targetDisorderId ?? ''}
               onChange={(event) => {
@@ -259,13 +260,13 @@ export function GameBoard(props: GameBoardProps) {
                 setTremorsIds([])
               }}
             >
-              <option value="">Choose Disorder</option>
+              <option value="">{t('chooseDisorder')}</option>
               {untreatedTarget.map((slot) => (
                 <option
                   key={slot.disorder.instanceId}
                   value={slot.disorder.instanceId}
                 >
-                  {slot.disorder.displayName}
+                  {cardName(slot.disorder.definitionId, slot.disorder.displayName)}
                 </option>
               ))}
             </select>
@@ -273,17 +274,17 @@ export function GameBoard(props: GameBoardProps) {
         )}
         {isAnxiety && target && targetHand.length > 0 && (
           <label>
-            Take card
+            {t('takeCard')}
             <select
               value={chosenCardId ?? ''}
               onChange={(event) =>
                 setChosenCardId(event.target.value || undefined)
               }
             >
-              <option value="">Choose card</option>
+              <option value="">{t('chooseCard')}</option>
               {targetHand.map((card) => (
                 <option key={card.instanceId} value={card.instanceId}>
-                  {card.displayName}
+                  {cardName(card.definitionId, card.displayName)}
                 </option>
               ))}
             </select>
@@ -291,7 +292,7 @@ export function GameBoard(props: GameBoardProps) {
         )}
         {isTremors && target && targetHand.length >= 3 && (
           <fieldset>
-            <legend>Tremors: discard exactly 3 target cards</legend>
+            <legend>{t('tremorsChoice')}</legend>
             {targetHand.map((card) => (
               <label className="check" key={card.instanceId}>
                 <input
@@ -305,7 +306,7 @@ export function GameBoard(props: GameBoardProps) {
                     )
                   }
                 />
-                {card.displayName}
+                {cardName(card.definitionId, card.displayName)}
               </label>
             ))}
           </fieldset>
@@ -330,7 +331,7 @@ export function GameBoard(props: GameBoardProps) {
             }
           }}
         >
-          Play Episode
+          {t('playEpisode')}
         </button>
       </>
     )
@@ -349,14 +350,14 @@ export function GameBoard(props: GameBoardProps) {
   return (
     <main className="game-board">
       <header className="status-bar">
-        <strong>Current: {current.name}</strong>
-        <span>Turn {game.turnNumber}</span>
-        <span>Phase: {game.turn.phase}</span>
-        <span>Played: {game.turn.cardsPlayedThisTurn}/2</span>
-        <span>Draw: {drawPileCount}</span>
-        <span>Discard: {discardPileCount}</span>
+        <strong>{t('currentPlayer')}: {current.name}</strong>
+        <span>{t('turn')} {game.turnNumber}</span>
+        <span>{t('phase')}: {phaseName(game.turn.phase)}</span>
+        <span>{t('cardsPlayed')}: {game.turn.cardsPlayedThisTurn}/2</span>
+        <span>{t('drawPile')}: {drawPileCount}</span>
+        <span>{t('discardPile')}: {discardPileCount}</span>
       </header>
-      {props.error && <p className="error">{props.error}</p>}
+      {props.error && <p className="error">{localizeError(props.error)}</p>}
       <section className="players">
         {game.players.map((player) => (
           <article
@@ -364,18 +365,18 @@ export function GameBoard(props: GameBoardProps) {
             key={player.id}
           >
             <h2>{player.name}</h2>
-            <p>Hand: {handOf(player).length}</p>
+            <p>{t('hand')}: {handOf(player).length}</p>
             {(player.effects.skipTurns > 0 ||
               player.effects.skipDrawTurns > 0 ||
               player.effects.cannotPlayTurns > 0) && (
               <p className="effects">
-                Effects:{' '}
+                {t('effects')}:{' '}
                 {player.effects.skipTurns > 0 &&
-                  `skip turn ×${player.effects.skipTurns} `}
+                  `${t('skipTurn')} ×${player.effects.skipTurns} `}
                 {player.effects.skipDrawTurns > 0 &&
-                  `skip draw ×${player.effects.skipDrawTurns} `}
+                  `${t('cannotDraw')} ×${player.effects.skipDrawTurns} `}
                 {player.effects.cannotPlayTurns > 0 &&
-                  `cannot play ×${player.effects.cannotPlayTurns}`}
+                  `${t('cannotPlay')} ×${player.effects.cannotPlayTurns}`}
               </p>
             )}
             <Psyche player={player} />
@@ -383,7 +384,7 @@ export function GameBoard(props: GameBoardProps) {
         ))}
       </section>
       <section className="hand panel">
-        <h2>{viewer.name}'s hand</h2>
+        <h2>{t('hand')} — {viewer.name}</h2>
         <div className="cards">
           {viewerHand.map((card) => (
             <CardButton
@@ -397,7 +398,7 @@ export function GameBoard(props: GameBoardProps) {
         <div className="action-panel">{actionPanel}</div>
       </section>
       <section className="game-log panel">
-        <h2>Game log</h2>
+        <h2>{t('gameLog')}</h2>
         <ol>
           {props.gameLog.slice(-10).map((entry, index) => (
             <li key={`${entry}-${index}`}>{entry}</li>
@@ -410,7 +411,7 @@ export function GameBoard(props: GameBoardProps) {
           disabled={!isViewerTurn || game.turn.phase !== 'draw'}
           onClick={props.onDraw}
         >
-          Draw
+          {t('draw')}
         </button>
         <button
           type="button"
@@ -418,7 +419,7 @@ export function GameBoard(props: GameBoardProps) {
           disabled={!isViewerTurn || game.turn.phase !== 'play'}
           onClick={props.onEndTurn}
         >
-          End Turn
+          {t('endTurn')}
         </button>
       </footer>
     </main>

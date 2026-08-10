@@ -107,7 +107,7 @@ export class RoomService {
       { playerIds: room.players.map((player) => player.id) },
     )
     room.status = 'playing'
-    room.gameLog.push('Game started.')
+    room.gameLog.push('Ván chơi đã bắt đầu.')
     this.persistRoom(room)
     return room
   }
@@ -294,15 +294,15 @@ export class RoomService {
   private publicLogEntry(game: GameState, command: GameCommand): string {
     const actor =
       game.players.find((player) => player.id === game.currentPlayerId)?.name ??
-      'A player'
+      'Một người chơi'
     const labels: Record<GameCommand['type'], string> = {
-      draw: 'drew cards',
-      playDrug: 'treated a Disorder',
-      playDisorder: 'played a Disorder on an opponent',
-      playEpisode: 'triggered an Episode',
-      playTherapy: 'used Therapy',
-      discard: 'discarded a card',
-      endTurn: 'ended their turn',
+      draw: 'đã rút 2 lá',
+      playDrug: 'đã điều trị một Rối loạn',
+      playDisorder: 'đã gây một Rối loạn cho đối thủ',
+      playEpisode: 'đã kích hoạt một Cơn phát bệnh',
+      playTherapy: 'đã dùng Trị liệu',
+      discard: 'đã bỏ một lá bài',
+      endTurn: 'đã kết thúc lượt',
     }
     return `${actor} ${labels[command.type]}.`
   }

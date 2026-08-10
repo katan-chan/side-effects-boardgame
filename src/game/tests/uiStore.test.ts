@@ -82,7 +82,7 @@ describe('local UI adapter', () => {
       }),
     )
 
-    expect(html).toContain('Ada wins!')
-    expect(html).toContain('New Game')
+    expect(html).toContain('Ada đã chiến thắng!')
+    expect(html).toContain('Ván mới')
   })
 })

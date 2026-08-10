@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { t } from '../i18n'
 
 interface SetupScreenProps {
   error?: string
@@ -6,18 +7,18 @@ interface SetupScreenProps {
 }
 
 export function SetupScreen({ error, onStart }: SetupScreenProps) {
-  const [names, setNames] = useState(['Player 1', 'Player 2'])
+  const [names, setNames] = useState([`${t('player')} 1`, `${t('player')} 2`])
   const localError =
     names.length < 2 || names.length > 8 || names.some((name) => !name.trim())
 
   return (
     <main className="setup-screen">
       <section className="panel">
-        <h1>Side Effects</h1>
-        <p>Local base-game prototype</p>
+        <h1>{t('title')}</h1>
+        <p>{t('localGame')}</p>
         {names.map((name, index) => (
           <label className="name-field" key={`player-${index + 1}`}>
-            Player {index + 1}
+            {t('player')} {index + 1}
             <span>
               <input
                 value={name}
@@ -38,7 +39,7 @@ export function SetupScreen({ error, onStart }: SetupScreenProps) {
                   )
                 }
               >
-                Remove
+                {t('remove')}
               </button>
             </span>
           </label>
@@ -50,11 +51,11 @@ export function SetupScreen({ error, onStart }: SetupScreenProps) {
             onClick={() =>
               setNames((current) => [
                 ...current,
-                `Player ${current.length + 1}`,
+                `${t('player')} ${current.length + 1}`,
               ])
             }
           >
-            Add player
+            {t('addPlayer')}
           </button>
           <button
             type="button"
@@ -62,7 +63,7 @@ export function SetupScreen({ error, onStart }: SetupScreenProps) {
             disabled={localError}
             onClick={() => onStart(names.map((name) => name.trim()))}
           >
-            Start game
+            {t('startGame')}
           </button>
         </div>
         {localError && (

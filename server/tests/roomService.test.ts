@@ -237,7 +237,7 @@ describe('authoritative rooms', () => {
     const targetView = createPlayerView(game, target.id, pending)
     expect(
       attackerView.pendingDecision?.choices?.map((choice) => choice.label),
-    ).toEqual(target.hand.map((_, index) => `Card ${index + 1}`))
+    ).toEqual(target.hand.map((_, index) => `Lá bài ${index + 1}`))
     expect(targetView.pendingDecision?.choices).toBeUndefined()
     expect(JSON.stringify(attackerView.pendingDecision)).not.toContain(
       target.hand[0].instanceId,

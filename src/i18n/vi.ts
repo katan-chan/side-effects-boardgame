@@ -1,0 +1,29 @@
+import type { Translation } from './types'
+
+export const vi: Translation = {
+  strings: {
+    title: 'Tác Dụng Phụ', chooseMode: 'Chọn cách chơi.', localGame: 'Chơi cùng máy', onlineGame: 'Chơi trực tuyến',
+    back: 'Quay lại', player: 'Người chơi', remove: 'Xóa', addPlayer: 'Thêm người chơi', startGame: 'Bắt đầu',
+    enterPlayers: 'Nhập từ 2 đến 8 tên người chơi không để trống.', displayName: 'Tên người chơi', roomCode: 'Mã phòng',
+    createRoom: 'Tạo phòng', joinRoom: 'Vào phòng', host: 'Chủ phòng', connected: 'Đã kết nối', disconnected: 'Mất kết nối',
+    connecting: 'Đang kết nối...', reconnecting: 'Đang kết nối lại...', unavailable: 'Không thể kết nối tới máy chủ.',
+    waitingForReconnect: 'Đang chờ người chơi kết nối lại...', waitingForHost: 'Đang chờ Chủ phòng bắt đầu.',
+    yourTurn: 'Lượt của bạn', waitingFor: 'Đang chờ {player}...', currentPlayer: 'Người đang chơi', turn: 'Lượt', phase: 'Giai đoạn',
+    cardsPlayed: 'Số lá đã chơi', drawPile: 'Chồng bài rút', discardPile: 'Chồng bài bỏ', hand: 'Bài trên tay', psyche: 'Tâm trí',
+    draw: 'Rút bài', drawTwo: 'Rút 2 lá', play: 'Chơi bài', discard: 'Bỏ bài', endTurn: 'Kết thúc lượt',
+    selectCard: 'Chọn một lá bài trên tay.', drawBeforePlay: 'Hãy rút bài trước.', selectOpponent: 'Chọn đối thủ', targetPlayer: 'Người chơi mục tiêu',
+    ownUntreatedDisorder: 'Rối loạn chưa điều trị của bạn', targetUntreatedDisorder: 'Rối loạn chưa điều trị mục tiêu', chooseDisorder: 'Chọn Rối loạn',
+    playDrug: 'Chơi Thuốc', playTherapy: 'Chơi Trị liệu', playDisorder: 'Chơi Rối loạn', playEpisode: 'Chơi Cơn phát bệnh',
+    discardSelected: 'Bỏ lá đã chọn', takeCard: 'Lấy lá bài', chooseCard: 'Chọn lá bài', gameLog: 'Nhật ký ván chơi',
+    treated: 'Đã điều trị', untreated: 'Chưa điều trị', effects: 'Hiệu ứng', skipTurn: 'Bỏ lượt', cannotDraw: 'Không thể rút bài', cannotPlay: 'Không thể chơi bài',
+    newGame: 'Ván mới', winner: 'Người chiến thắng', wins: '{player} đã chiến thắng!',
+    anxietyChoice: 'Lo âu: chọn một lá bài ẩn', tremorsChoice: 'Run rẩy: bỏ 3 lá bài', discardThree: 'Bỏ 3 lá bài',
+    waitingDecision: 'Đang chờ người chơi xử lý {effect}.', treatLabel: 'Điều trị', mayCause: 'Có thể gây',
+    phaseDraw: 'Rút bài', phasePlay: 'Chơi bài', phaseDiscard: 'Bỏ bài',
+  },
+  disorders: { madness: 'Loạn trí', 'suicidal-thoughts': 'Ý nghĩ tự sát', depression: 'Trầm cảm', tremors: 'Run rẩy', 'gambling-addiction': 'Nghiện cờ bạc', anxiety: 'Lo âu', impotence: 'Rối loạn cương dương', anorexia: 'Chán ăn tâm thần' },
+  cardTypes: { disorder: 'Rối loạn', drug: 'Thuốc', episode: 'Cơn phát bệnh', therapy: 'Trị liệu' },
+  episodeDescriptions: {
+    madness: 'Bỏ tất cả Thuốc đang nằm trong Tâm trí của bạn.', 'suicidal-thoughts': 'Bỏ toàn bộ bài trên tay.', depression: 'Bỏ qua lượt tiếp theo của bạn.', tremors: 'Trong 3 giây, chọn và bỏ 3 lá trên tay. Nếu không hoàn thành kịp, bỏ toàn bộ bài trên tay.', 'gambling-addiction': 'Người gây Cơn phát bệnh lấy ngẫu nhiên tối đa 3 lá từ tay bạn.', anxiety: 'Cho người gây Cơn phát bệnh xem bài trên tay; họ lấy 1 lá.', impotence: 'Trong lượt tiếp theo, bạn không được chơi lá bài nào.', anorexia: 'Trong lượt tiếp theo, bạn không được rút bài.',
+  },
+}

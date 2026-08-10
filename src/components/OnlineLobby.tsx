@@ -8,6 +8,7 @@ import {
   type RoomView,
 } from '../multiplayer/multiplayerClient'
 import type { PlayerGameView } from '../../server/game/playerView'
+import { disorderName, localizeError, t } from '../i18n'
 
 interface OnlineLobbyProps {
   onBack: () => void
@@ -66,13 +67,13 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
       <main className="online-game">
         <p className="connection-status">
           {currentRoomPlayer?.connected === false
-            ? `${currentRoomPlayer.displayName} disconnected — waiting for reconnect`
+            ? `${currentRoomPlayer.displayName} — ${t('waitingForReconnect')}`
             : game.currentPlayerId === viewerId
-              ? 'Your turn'
-              : `Waiting for ${currentRoomPlayer?.displayName ?? 'current player'}`}
+              ? t('yourTurn')
+              : t('waitingFor', { player: currentRoomPlayer?.displayName ?? t('currentPlayer') })}
         </p>
         {connectionState !== 'connected' && (
-          <p className="error">Server {connectionState}. Reconnecting…</p>
+          <p className="error">{t('reconnecting')}</p>
         )}
         {game.pendingDecision && (
           <PendingDecision
@@ -138,20 +139,20 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
     <main className="setup-screen">
       <section className="panel online-lobby">
         <button type="button" onClick={onBack}>
-          ← Back
+          {t('back')}
         </button>
-        <h1>Online Game</h1>
+        <h1>{t('onlineGame')}</h1>
         {connectionState !== 'connected' && (
           <p className="error">
             {connectionState === 'unavailable'
-              ? 'Multiplayer server is unavailable.'
-              : `Server ${connectionState}.`}
+              ? t('unavailable')
+              : connectionState === 'connecting' ? t('connecting') : t('reconnecting')}
           </p>
         )}
         {!room && (
           <>
             <label className="name-field">
-              Display name
+              {t('displayName')}
               <input
                 value={displayName}
                 onChange={(event) => setDisplayName(event.target.value)}
@@ -166,11 +167,11 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
                   clientRef.current?.createRoom(displayName.trim())
                 }
               >
-                Create Room
+                {t('createRoom')}
               </button>
             </div>
             <label className="name-field">
-              Room code
+              {t('roomCode')}
               <input
                 value={roomCode}
                 maxLength={6}
@@ -187,25 +188,25 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
                 clientRef.current?.joinRoom(roomCode, displayName.trim())
               }
             >
-              Join Room
+              {t('joinRoom')}
             </button>
           </>
         )}
         {room && (
           <>
             <p className="room-code">
-              Room code: <strong>{room.id}</strong>
+              {t('roomCode')}: <strong>{room.id}</strong>
             </p>
             <p>
-              {room.players.length}/8 players{' '}
-              {allConnected ? 'connected' : '— waiting for reconnect'}
+              {room.players.length}/8 {t('player').toLowerCase()}{' '}
+              {allConnected ? t('connected') : `— ${t('waitingForReconnect')}`}
             </p>
             <ul className="lobby-players">
               {room.players.map((player) => (
                 <li key={player.id}>
                   <strong>{player.displayName}</strong>
-                  {player.id === room.hostPlayerId && ' (Host)'} —{' '}
-                  {player.connected ? 'connected' : 'disconnected'}
+                  {player.id === room.hostPlayerId && ` (${t('host')})`} —{' '}
+                  {player.connected ? t('connected') : t('disconnected')}
                 </li>
               ))}
             </ul>
@@ -216,13 +217,13 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
                 disabled={!canStart}
                 onClick={() => clientRef.current?.startRoom()}
               >
-                Start Game
+                {t('startGame')}
               </button>
             )}
-            {!isHost && <p>Waiting for host to start.</p>}
+            {!isHost && <p>{t('waitingForHost')}</p>}
           </>
         )}
-        {error && <p className="error">{error}</p>}
+        {error && <p className="error">{localizeError(error)}</p>}
       </section>
     </main>
   )
@@ -242,13 +243,13 @@ function PendingDecision({
   if (!isChooser)
     return (
       <section className="panel pending-decision">
-        Waiting for a player to resolve {decision.kind}.
+        {t('waitingDecision', { effect: disorderName(decision.kind) })}
       </section>
     )
   if (decision.kind === 'anxiety')
     return (
       <section className="panel pending-decision">
-        <h2>Anxiety: choose a hidden card</h2>
+        <h2>{t('anxietyChoice')}</h2>
         {decision.choices?.map((choice) => (
           <button
             type="button"
@@ -262,7 +263,7 @@ function PendingDecision({
     )
   return (
     <section className="panel pending-decision">
-      <h2>Tremors: discard 3 cards</h2>
+      <h2>{t('tremorsChoice')}</h2>
       {decision.choices?.map((choice) => (
         <label className="check" key={choice.id}>
           <input
@@ -285,7 +286,7 @@ function PendingDecision({
         disabled={selected.length !== 3}
         onClick={() => onResolve(selected)}
       >
-        Discard 3 cards
+        {t('discardThree')}
       </button>
     </section>
   )

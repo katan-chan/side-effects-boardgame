@@ -80,7 +80,7 @@ export function createPlayerView(
                   id,
                   label:
                     pendingDecision.kind === 'anxiety'
-                      ? `Card ${index + 1}`
+                      ? `Lá bài ${index + 1}`
                       : id,
                 }),
               ),
