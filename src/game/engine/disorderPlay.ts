@@ -1,5 +1,6 @@
 import { canReceiveDisorder } from './sideEffects'
 import { cannotPlayCards } from './temporaryEffects'
+import { assertGameIsPlaying } from './gameStatus'
 import type { GameState } from './types'
 
 const MAX_CARDS_PLAYED_PER_TURN = 2
@@ -11,6 +12,7 @@ export function playDisorder(
   disorderCardId: string,
   targetPlayerId: string,
 ): GameState {
+  assertGameIsPlaying(game)
   if (playerId !== game.currentPlayerId) {
     throw new Error('Only the current player may take this action.')
   }

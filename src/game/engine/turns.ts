@@ -1,6 +1,7 @@
 import type { CardInstance } from '../cards/types'
 import { shuffle, systemRandom, type RandomSource } from './random'
 import { cannotPlayCards } from './temporaryEffects'
+import { assertGameIsPlaying } from './gameStatus'
 import type { GameState, PlayerState, TurnState } from './types'
 
 const CARDS_PER_TURN = 2
@@ -158,6 +159,7 @@ function drawAvailableCards(
 
 /** Confirms that the current game is ready for the current player's draw phase. */
 export function startTurn(game: GameState): GameState {
+  assertGameIsPlaying(game)
   if (game.status !== 'playing') {
     throw new Error('A turn can only start while the game is playing.')
   }
@@ -171,6 +173,7 @@ export function drawForTurn(
   playerId: string,
   options: TurnCommandOptions = {},
 ): GameState {
+  assertGameIsPlaying(game)
   assertCurrentPlayer(game, playerId)
   assertPhase(game, 'draw')
 
@@ -208,6 +211,7 @@ export function registerCardPlayed(
   playerId: string,
   cardInstanceId: string,
 ): GameState {
+  assertGameIsPlaying(game)
   assertCurrentPlayer(game, playerId)
   assertPhase(game, 'play')
 
@@ -251,6 +255,7 @@ export function discardCard(
   playerId: string,
   cardInstanceId: string,
 ): GameState {
+  assertGameIsPlaying(game)
   assertCurrentPlayer(game, playerId)
   assertPhase(game, 'discard')
 
@@ -280,6 +285,7 @@ export function discardCard(
 
 /** Ends a play phase, or enters discard phase when the hand exceeds six cards. */
 export function endTurn(game: GameState, playerId: string): GameState {
+  assertGameIsPlaying(game)
   assertCurrentPlayer(game, playerId)
   assertPhase(game, 'play')
 

@@ -44,4 +44,5 @@ export interface GameState {
   turnNumber: number
   turn: TurnState
   status: 'setup' | 'playing' | 'finished'
+  winnerPlayerId?: string
 }

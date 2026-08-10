@@ -1,6 +1,9 @@
 import { episodeHandlers, type EpisodeEffectOptions } from './episodeHandlers'
 import { cannotPlayCards } from './temporaryEffects'
+import { assertGameIsPlaying } from './gameStatus'
 import type { GameState } from './types'
+
+export type { EpisodeEffectOptions } from './episodeHandlers'
 
 const MAX_CARDS_PLAYED_PER_TURN = 2
 
@@ -13,6 +16,7 @@ export function playEpisode(
   targetDisorderCardId: string,
   options: EpisodeEffectOptions = {},
 ): GameState {
+  assertGameIsPlaying(game)
   if (playerId !== game.currentPlayerId) {
     throw new Error('Only the current player may take this action.')
   }

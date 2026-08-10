@@ -1,5 +1,6 @@
 import type { GameState, PlayerState } from './types'
 import { cannotPlayCards } from './temporaryEffects'
+import { assertGameIsPlaying, finalizeGameIfWon } from './gameStatus'
 
 const MAX_CARDS_PLAYED_PER_TURN = 2
 
@@ -19,6 +20,7 @@ export function playDrug(
   drugCardId: string,
   disorderCardId: string,
 ): GameState {
+  assertGameIsPlaying(game)
   if (playerId !== game.currentPlayerId) {
     throw new Error('Only the current player may take this action.')
   }
@@ -60,7 +62,7 @@ export function playDrug(
     throw new Error('This Drug does not treat the target Disorder.')
   }
 
-  return {
+  return finalizeGameIfWon({
     ...game,
     players: replaceCurrentPlayer(game, {
       ...currentPlayer,
@@ -75,5 +77,5 @@ export function playDrug(
       ...game.turn,
       cardsPlayedThisTurn: game.turn.cardsPlayedThisTurn + 1,
     },
-  }
+  })
 }

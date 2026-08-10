@@ -1,0 +1,192 @@
+:root {
+  font-family: Inter, system-ui, sans-serif;
+  color: #1f2937;
+  background: #f1f5f9;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+button,
+input,
+select {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+  border: 1px solid #94a3b8;
+  border-radius: 0.4rem;
+  padding: 0.45rem 0.7rem;
+  background: white;
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.primary {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: white;
+}
+.panel {
+  background: white;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.65rem;
+  padding: 1rem;
+  box-shadow: 0 1px 2px #cbd5e155;
+}
+.setup-screen,
+.finished-screen {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 1rem;
+}
+.setup-screen .panel,
+.finished-screen {
+  width: min(100%, 34rem);
+}
+.name-field {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.75rem 0;
+}
+.name-field span {
+  display: flex;
+  gap: 0.5rem;
+}
+.name-field input {
+  width: 100%;
+  padding: 0.4rem;
+}
+.button-row {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+.error {
+  color: #b91c1c;
+  font-weight: 600;
+}
+.game-board {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+.status-bar {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  background: #0f172a;
+  color: white;
+  border-radius: 0.6rem;
+}
+.players {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+.current-player {
+  border: 2px solid #2563eb;
+}
+.effects {
+  color: #9a3412;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.player h2,
+.hand h2 {
+  margin-top: 0;
+}
+.psyche {
+  display: grid;
+  gap: 0.5rem;
+}
+.slot {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.55rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.4rem;
+}
+.treated,
+.untreated {
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.treated {
+  color: #15803d;
+}
+.untreated {
+  color: #b91c1c;
+}
+.hand {
+  margin-top: 1rem;
+}
+.game-log {
+  margin-top: 1rem;
+}
+.game-log h2 {
+  margin-top: 0;
+}
+.game-log ol {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+.cards {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.card {
+  width: 9rem;
+  min-height: 4.5rem;
+  text-align: left;
+  display: grid;
+  gap: 0.3rem;
+}
+.card.selected {
+  outline: 3px solid #2563eb;
+}
+.card small {
+  color: #475569;
+  text-transform: uppercase;
+}
+.action-panel {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1rem;
+  max-width: 32rem;
+}
+.action-panel label {
+  display: grid;
+  gap: 0.25rem;
+}
+.action-panel select {
+  padding: 0.4rem;
+}
+.check {
+  display: flex !important;
+  align-items: center;
+  gap: 0.4rem;
+}
+.check input {
+  width: auto;
+}
+fieldset {
+  border: 1px solid #cbd5e1;
+  border-radius: 0.4rem;
+}
+@media (max-width: 600px) {
+  .game-board {
+    padding: 0.6rem;
+  }
+  .status-bar {
+    gap: 0.5rem;
+  }
+}

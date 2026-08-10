@@ -1,6 +1,7 @@
 import type { DisorderDefinition } from '../cards/types'
 import type { GameState } from './types'
 import { cannotPlayCards } from './temporaryEffects'
+import { assertGameIsPlaying, finalizeGameIfWon } from './gameStatus'
 
 const MAX_CARDS_PLAYED_PER_TURN = 2
 
@@ -15,6 +16,7 @@ export function playTherapy(
   therapyCardId: string,
   disorderCardId: string,
 ): GameState {
+  assertGameIsPlaying(game)
   if (playerId !== game.currentPlayerId) {
     throw new Error('Only the current player may take this action.')
   }
@@ -54,7 +56,7 @@ export function playTherapy(
     throw new Error('This Disorder cannot be treated with Therapy.')
   }
 
-  return {
+  return finalizeGameIfWon({
     ...game,
     players: game.players.map((player, index) =>
       index === game.currentPlayerIndex
@@ -76,5 +78,5 @@ export function playTherapy(
       ...game.turn,
       cardsPlayedThisTurn: game.turn.cardsPlayedThisTurn + 1,
     },
-  }
+  })
 }
