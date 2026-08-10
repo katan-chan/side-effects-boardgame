@@ -237,6 +237,7 @@ export function GameBoard(props: GameBoardProps) {
             targetPlayerId={
               isTargetingMode && selectedCard?.cardType === 'disorder' ? focusedOpponentId : undefined
             }
+            currentPlayerId={game.currentPlayerId}
           />
         )}
         {focusedOpponent && (
@@ -265,43 +266,32 @@ export function GameBoard(props: GameBoardProps) {
       </section>
 
       <section className="center-zone">
-        <header className="status-bar">
-          <strong>{t('currentPlayer')}: {current.name}</strong>
-          <span>{t('turn')} {game.turnNumber}</span>
-          <span>{t('phase')}: {phaseName(game.turn.phase)}</span>
-          <span>{t('cardsPlayed')}: {game.turn.cardsPlayedThisTurn}/2</span>
-          <span>{t('drawPile')}: {drawPileCount}</span>
-          <span>{t('discardPile')}: {discardPileCount}</span>
-        </header>
         <div className="deck-area">
-          <button type="button" style={{ padding: 0, background: 'none', border: 'none' }} onClick={() => !isLocked && props.onDraw()} disabled={!isViewerTurn || game.turn.phase !== 'draw'}>
+          <button type="button" className="draw-pile" style={{ padding: 0, background: 'none', border: 'none' }} onClick={() => !isLocked && props.onDraw()} disabled={!isViewerTurn || game.turn.phase !== 'draw'}>
             <CardBack label={t('drawPile')} count={drawPileCount} />
           </button>
-          <CardBack label={t('discardPile')} count={discardPileCount} />
-        </div>
-        <div className="action-bar">
-          {isTargetingMode && game.turn.phase === 'discard' && (
-            <button type="button" className="primary" onClick={() => {
-              const currentId = selectedCardId
-              if (currentId) executeCommand(() => props.onDiscard(currentId))
-            }}>
-              {t('discardSelected')}
-            </button>
-          )}
-          <button
-            type="button"
-            className="primary"
-            disabled={!isViewerTurn || game.turn.phase !== 'play' || isLocked}
-            onClick={() => executeCommand(props.onEndTurn)}
-          >
-            {t('endTurn')}
-          </button>
+          <div className="discard-pile">
+            <CardBack label={t('discardPile')} count={discardPileCount} />
+          </div>
         </div>
       </section>
 
+
       <section className="self-zone">
         {props.error && <p className="error" style={{ marginBottom: '1rem' }}>{localizeError(props.error)}</p>}
+        
+        <div className="hud-glass">
+          {isViewerTurn ? <strong>Lượt của bạn</strong> : <span>Lượt của {current.name}</span>}
+          <span className="divider">|</span>
+          <span>{phaseName(game.turn.phase)}</span>
+          <span className="divider">|</span>
+          <span>{game.turn.cardsPlayedThisTurn}/2 thẻ</span>
+        </div>
+
         <article className="player viewer-player">
+          <header className="own-nameplate">
+            <strong>Bạn — {viewer.name}</strong>
+          </header>
           <Psyche
             player={viewer}
             playerId={viewer.id}
@@ -311,26 +301,47 @@ export function GameBoard(props: GameBoardProps) {
             onTargetSlot={handleTargetSlot}
           />
         </article>
-        <section className="hand own-hand">
-          <div className="cards">
-            {viewerHand.map((card) => (
-              <CardButton
-                card={card}
-                key={card.instanceId}
-                selected={card.instanceId === selectedCardId}
-                onClick={() => {
-                  if (selectedCardId === card.instanceId) setSelectedCardId(undefined)
-                  else setSelectedCardId(card.instanceId)
-                }}
-              />
-            ))}
+        
+        <div className="hand-and-controls">
+          <section className="hand own-hand">
+            <div className="cards">
+              {viewerHand.map((card) => (
+                <CardButton
+                  card={card}
+                  key={card.instanceId}
+                  selected={card.instanceId === selectedCardId}
+                  onClick={() => {
+                    if (selectedCardId === card.instanceId) setSelectedCardId(undefined)
+                    else setSelectedCardId(card.instanceId)
+                  }}
+                />
+              ))}
+            </div>
+          </section>
+          
+          <div className="controls-bar">
+            {isTargetingMode && game.turn.phase === 'discard' && (
+              <button type="button" className="primary action-btn" onClick={() => {
+                const currentId = selectedCardId
+                if (currentId) executeCommand(() => props.onDiscard(currentId))
+              }}>
+                {t('discardSelected')}
+              </button>
+            )}
+            <button
+              type="button"
+              className="primary action-btn end-turn-btn"
+              disabled={!isViewerTurn || game.turn.phase !== 'play' || isLocked}
+              onClick={() => executeCommand(props.onEndTurn)}
+            >
+              {t('endTurn')}
+            </button>
+            <button className="log-icon-btn" type="button" onClick={(e) => { e.stopPropagation(); setShowLog(!showLog); }} aria-label={t('gameLog')}>
+              📜
+            </button>
           </div>
-        </section>
+        </div>
       </section>
-
-      <button className="log-toggle" type="button" onClick={() => setShowLog(!showLog)}>
-        {t('gameLog')}
-      </button>
 
       <GameLogDrawer gameLog={props.gameLog} showLog={showLog} setShowLog={setShowLog} />
     </main>

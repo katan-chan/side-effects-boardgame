@@ -9,6 +9,7 @@ interface OpponentAvatarBarProps {
   focusedOpponentId?: string
   setFocusedOpponentId: (id: string) => void
   targetPlayerId?: string
+  currentPlayerId: string
 }
 
 export function OpponentAvatarBar({
@@ -16,6 +17,7 @@ export function OpponentAvatarBar({
   focusedOpponentId,
   setFocusedOpponentId,
   targetPlayerId,
+  currentPlayerId,
 }: OpponentAvatarBarProps) {
   return (
     <section className="opponent-avatar-bar">
@@ -28,7 +30,7 @@ export function OpponentAvatarBar({
           <button
             key={opponent.id}
             type="button"
-            className={`opponent-avatar ${isFocused ? 'focused' : ''} ${isTargeted ? 'targeted' : ''}`}
+            className={`opponent-avatar ${isFocused ? 'focused' : ''} ${isTargeted ? 'targeted' : ''} ${opponent.id === currentPlayerId ? 'current-turn' : ''}`}
             onClick={() => setFocusedOpponentId(opponent.id)}
           >
             <div className="avatar-icon">{opponent.name.slice(0, 1).toUpperCase()}</div>
