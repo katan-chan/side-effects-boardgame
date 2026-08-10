@@ -86,7 +86,10 @@ export function createMultiplayerClient(
     resumingSession = false
     handlers.onSessionRestored?.(session)
   })
-  socket.on('room:left', () => handlers.onRoomLeft?.())
+  socket.on('room:left', () => {
+    clearSavedSession()
+    handlers.onRoomLeft?.()
+  })
   socket.on('connect', () => {
     handlers.onConnectionState?.('connected')
     const session = getSavedSession()
@@ -111,10 +114,7 @@ export function createMultiplayerClient(
         displayName,
       }),
     startRoom: () => socket.emit('room:start'),
-    leaveRoom: () => {
-      clearSavedSession()
-      socket.emit('room:leave')
-    },
+    leaveRoom: () => socket.emit('room:leave'),
     sendCommand: (command: GameCommand) => socket.emit('game:command', command),
     resolveDecision: (decisionId: string, choiceIds: string[]) =>
       socket.emit('game:decision', { decisionId, choiceIds }),
