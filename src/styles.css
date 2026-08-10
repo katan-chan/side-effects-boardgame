@@ -48,6 +48,15 @@ button:disabled {
 .finished-screen {
   width: min(100%, 34rem);
 }
+.online-lobby {
+  width: min(100%, 34rem);
+}
+.room-code {
+  font-size: 1.15rem;
+}
+.lobby-players {
+  padding-left: 1.25rem;
+}
 .name-field {
   display: grid;
   gap: 0.25rem;

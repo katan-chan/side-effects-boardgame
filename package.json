@@ -5,16 +5,20 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev:client": "vite",
+    "dev:server": "tsx watch server/index.ts",
+    "build": "tsc -b && vite build && tsc -p tsconfig.server.json",
     "test": "vitest run",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
-    "vite": "latest",
     "react": "latest",
     "react-dom": "latest",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
+    "vite": "latest",
     "zustand": "latest"
   },
   "devDependencies": {
@@ -26,6 +30,7 @@
     "eslint-config-prettier": "latest",
     "globals": "latest",
     "prettier": "latest",
+    "tsx": "^4.23.11",
     "typescript": "~5.7.2",
     "typescript-eslint": "latest",
     "vitest": "latest"

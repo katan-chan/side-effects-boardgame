@@ -9,6 +9,7 @@ const INITIAL_HAND_SIZE = 4
 
 export interface CreateGameOptions {
   rng?: RandomSource
+  playerIds?: readonly string[]
 }
 
 function validatePlayerNames(playerNames: readonly string[]): void {
@@ -83,6 +84,17 @@ export function createGame(
 ): GameState {
   validatePlayerNames(playerNames)
 
+  if (
+    options.playerIds &&
+    (options.playerIds.length !== playerNames.length ||
+      new Set(options.playerIds).size !== options.playerIds.length ||
+      options.playerIds.some((id) => id.trim().length === 0))
+  ) {
+    throw new Error(
+      'Player IDs must be non-empty and uniquely match player names.',
+    )
+  }
+
   const rng = options.rng ?? systemRandom
   const deck = createDeck()
   const disorders = shuffle(
@@ -98,7 +110,7 @@ export function createGame(
     playerNames.length,
   )
   const playersWithoutHands: PlayerState[] = playerNames.map((name, index) => ({
-    id: `player-${index + 1}`,
+    id: options.playerIds?.[index] ?? `player-${index + 1}`,
     name: name.trim(),
     hand: [],
     psyche: { slots: psyches[index].map((disorder) => ({ disorder })) },
