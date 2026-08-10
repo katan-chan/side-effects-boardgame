@@ -11,5 +11,6 @@ export interface PersistedRoomSnapshot {
 
 export interface RoomRepository {
   save(snapshot: PersistedRoomSnapshot): Promise<void>
+  deleteRoom(roomId: string): Promise<void>
   loadActive(): Promise<PersistedRoomSnapshot[]>
 }

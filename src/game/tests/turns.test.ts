@@ -4,8 +4,10 @@ import type { RandomSource } from '../engine/random'
 import { createGame } from '../engine/setup'
 import {
   discardCard,
+  discardManual,
   drawForTurn,
   endTurn,
+  forfeitGame,
   registerCardPlayed,
   startTurn,
 } from '../engine/turns'
@@ -205,5 +207,47 @@ describe('turn lifecycle', () => {
     expect(
       new Set(cards.map((card: CardInstance) => card.instanceId)).size,
     ).toBe(89)
+  })
+
+  it('manually discards one hand card during play and consumes one action', () => {
+    const afterDraw = draw(createTurnGame())
+    const card = currentPlayer(afterDraw).hand[0]
+    const afterDiscard = discardManual(
+      afterDraw,
+      afterDraw.currentPlayerId,
+      card.instanceId,
+    )
+
+    expect(currentPlayer(afterDiscard).hand).not.toContainEqual(card)
+    expect(afterDiscard.discardPile).toContainEqual(card)
+    expect(afterDiscard.turn.cardsPlayedThisTurn).toBe(1)
+    expect(allCards(afterDiscard)).toHaveLength(89)
+    expect(() =>
+      discardManual(afterDraw, afterDraw.players[1].id, card.instanceId),
+    ).toThrow('current player')
+    expect(() => discardManual(createTurnGame(), createTurnGame().currentPlayerId, card.instanceId)).toThrow('play phase')
+
+    const atLimit = { ...afterDiscard, turn: { ...afterDiscard.turn, cardsPlayedThisTurn: 2 } }
+    expect(() => discardManual(atLimit, atLimit.currentPlayerId, currentPlayer(atLimit).hand[0].instanceId)).toThrow('at most two')
+  })
+
+  it('allows only the current player to forfeit a two-player game without losing cards', () => {
+    const game = createTurnGame()
+    const winner = game.players.find((player) => player.id !== game.currentPlayerId)!
+    const forfeited = forfeitGame(game, game.currentPlayerId, {
+      rng: new SeededRandom(99),
+    })
+
+    expect(forfeited.status).toBe('finished')
+    expect(forfeited.winnerPlayerId).toBe(winner.id)
+    expect(forfeited.players[forfeited.currentPlayerIndex].hand).toEqual([])
+    expect(forfeited.players[forfeited.currentPlayerIndex].psyche.slots).toEqual([])
+    expect(allCards(forfeited)).toHaveLength(89)
+    expect(() => forfeitGame(game, winner.id)).toThrow('current player')
+  })
+
+  it('rejects forfeit in games with more than two players', () => {
+    const game = createGame(['Ada', 'Ben', 'Cam'], { rng: new SeededRandom(5) })
+    expect(() => forfeitGame(game, game.currentPlayerId)).toThrow('two-player')
   })
 })

@@ -98,6 +98,7 @@ export class RoomService {
       throw new Error('Player is not in this room.')
     if (remainingPlayers.length === 0) {
       this.rooms.delete(roomId)
+      this.deletePersistedRoom(roomId)
       return undefined
     }
     room.players = remainingPlayers
@@ -300,6 +301,17 @@ export class RoomService {
         this.logError('Room persistence failed; the in-memory game remains active.')
       })
     this.persistenceQueues.set(room.id, queued)
+  }
+
+  private deletePersistedRoom(roomId: string): void {
+    const previous = this.persistenceQueues.get(roomId) ?? Promise.resolve()
+    const queued = previous
+      .catch(() => undefined)
+      .then(() => this.repository.deleteRoom(roomId))
+      .catch(() => {
+        this.logError('Room persistence cleanup failed; the room may restore later.')
+      })
+    this.persistenceQueues.set(roomId, queued)
   }
 
   private createPlayerId(): string {

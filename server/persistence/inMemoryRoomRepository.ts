@@ -11,6 +11,10 @@ export class InMemoryRoomRepository implements RoomRepository {
     this.snapshots.set(snapshot.room.id, structuredClone(snapshot))
   }
 
+  async deleteRoom(roomId: string): Promise<void> {
+    this.snapshots.delete(roomId)
+  }
+
   async loadActive(): Promise<PersistedRoomSnapshot[]> {
     return [...this.snapshots.values()]
       .filter((snapshot) => snapshot.room.status !== 'finished')
