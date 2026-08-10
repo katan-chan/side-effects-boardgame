@@ -90,44 +90,55 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
           viewerPlayerId={viewerId}
           error={error}
           gameLog={gameLog}
-          onDraw={() => clientRef.current?.sendCommand({ type: 'draw' })}
-          onEndTurn={() => clientRef.current?.sendCommand({ type: 'endTurn' })}
-          onDiscard={(cardInstanceId) =>
+          onDraw={() => {
+            setError(undefined)
+            clientRef.current?.sendCommand({ type: 'draw' })
+          }}
+          onEndTurn={() => {
+            setError(undefined)
+            clientRef.current?.sendCommand({ type: 'endTurn' })
+          }}
+          onDiscard={(cardInstanceId) => {
+            setError(undefined)
             clientRef.current?.sendCommand({ type: 'discard', cardInstanceId })
-          }
-          onPlayDrug={(drugCardId, disorderCardId) =>
+          }}
+          onPlayDrug={(drugCardId, disorderCardId) => {
+            setError(undefined)
             clientRef.current?.sendCommand({
               type: 'playDrug',
               drugCardId,
               disorderCardId,
             })
-          }
-          onPlayDisorder={(disorderCardId, targetPlayerId) =>
+          }}
+          onPlayDisorder={(disorderCardId, targetPlayerId) => {
+            setError(undefined)
             clientRef.current?.sendCommand({
               type: 'playDisorder',
               disorderCardId,
               targetPlayerId,
             })
-          }
+          }}
           onPlayEpisode={(
             episodeCardId,
             targetPlayerId,
             targetDisorderCardId,
-          ) =>
+          ) => {
+            setError(undefined)
             clientRef.current?.sendCommand({
               type: 'playEpisode',
               episodeCardId,
               targetPlayerId,
               targetDisorderCardId,
             })
-          }
-          onPlayTherapy={(therapyCardId, disorderCardId) =>
+          }}
+          onPlayTherapy={(therapyCardId, disorderCardId) => {
+            setError(undefined)
             clientRef.current?.sendCommand({
               type: 'playTherapy',
               therapyCardId,
               disorderCardId,
             })
-          }
+          }}
         />
       </main>
     )

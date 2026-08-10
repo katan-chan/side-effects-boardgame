@@ -174,6 +174,12 @@ export function GameBoard(props: GameBoardProps) {
   }, [game.turnNumber, game.turn.cardsPlayedThisTurn, game.turn.phase, viewerHand])
 
   useEffect(() => {
+    if (props.error) {
+      setIsLocked(false)
+    }
+  }, [props.error])
+
+  useEffect(() => {
     if (focusedOpponent && focusedOpponent.id !== focusedOpponentId) {
       setFocusedOpponentId(focusedOpponent.id)
     }
