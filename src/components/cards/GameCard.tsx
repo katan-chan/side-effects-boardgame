@@ -35,17 +35,11 @@ export function GameCard({
           <span className="card-summary">{disorderName(definition.treats)}</span>
           <small className="card-label">{t('sideEffects')}</small>
           <div className="side-effect-list">
-            {(expanded
-              ? definition.sideEffects
-              : definition.sideEffects.slice(0, 2)
-            ).map((effect) => (
+            {definition.sideEffects.map((effect) => (
               <span className="side-effect-chip" key={effect}>
                 {disorderName(effect)}
               </span>
             ))}
-            {!expanded && definition.sideEffects.length > 2 && (
-              <span className="side-effect-chip">+{definition.sideEffects.length - 2}</span>
-            )}
           </div>
         </>
       )}

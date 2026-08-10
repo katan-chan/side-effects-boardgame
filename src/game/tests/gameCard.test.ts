@@ -25,15 +25,25 @@ describe('card information presentation', () => {
     expect(html).toContain('Loạn trí')
   })
 
-  it('shows named compact Side Effects instead of a numeric count', () => {
-    const html = render('depression-treatment', 'drug', 'Fluoxetine', false)
-    expect(html).toContain('Rối loạn cương dương')
-    expect(html).toContain('Ý nghĩ tự sát')
-    expect(html).toContain('+1')
-    expect(html).not.toContain('Có thể gây: 3')
-    expect(render('depression-treatment', 'drug', 'Fluoxetine')).toContain(
+  it('shows every named Side Effect on compact Drug cards without counts', () => {
+    const lorazepam = render('anxiety-treatment', 'drug', 'Lorazepam', false)
+    const pramipexole = render('tremors-treatment', 'drug', 'Pramipexole', false)
+    const fluoxetine = render('depression-treatment', 'drug', 'Fluoxetine', false)
+
+    for (const effect of ['Ý nghĩ tự sát', 'Trầm cảm', 'Loạn trí']) {
+      expect(lorazepam).toContain(effect)
+    }
+    for (const effect of ['Nghiện cờ bạc', 'Trầm cảm', 'Loạn trí']) {
+      expect(pramipexole).toContain(effect)
+    }
+    for (const effect of [
+      'Rối loạn cương dương',
+      'Ý nghĩ tự sát',
       'Chán ăn tâm thần',
-    )
+    ]) {
+      expect(fluoxetine).toContain(effect)
+    }
+    expect(fluoxetine).not.toMatch(/\+[12]|Có thể gây:\s*\d/)
   })
 
   it('renders a Disorder Episode description and action-card instructions', () => {
