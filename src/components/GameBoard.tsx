@@ -13,6 +13,9 @@ import { CardBack } from './cards/CardBack'
 import { OpponentAvatarBar } from './OpponentAvatarBar'
 import { GameLogDrawer } from './GameLogDrawer'
 import { GhostLayer, triggerGhost } from './GhostLayer'
+import { useGameAudio } from '../audio/useGameAudio'
+import { audioManager } from '../audio/audioManager'
+import { AudioSettings } from './AudioSettings'
 
 type BoardCard =
   | Pick<
@@ -156,6 +159,8 @@ export function GameBoard(props: GameBoardProps) {
   const [showLog, setShowLog] = useState(false)
   const [isLocked, setIsLocked] = useState(false) // Lock interactions while waiting for server
 
+  useGameAudio(game as PlayerGameView, viewer.id)
+
   const selectedCard = viewerHand.find((card) => card.instanceId === selectedCardId)
   const isTargetingMode = selectedCard !== undefined
 
@@ -204,27 +209,40 @@ export function GameBoard(props: GameBoardProps) {
     if (!selectedCard || isLocked || !isViewerTurn) return
 
     if (selectedCard.cardType === 'drug' && ownerId === viewer.id) {
-      triggerGhost(`hand-card-${selectedCard.instanceId}`, `slot-${slotId}`, selectedCard)
+      audioManager.play('click') // fallback click, semantic sound on land
+      triggerGhost(`hand-card-${selectedCard.instanceId}`, `slot-${slotId}`, selectedCard, 'card', () => {
+        audioManager.play('drug-play')
+      })
       executeCommand(() => props.onPlayDrug(selectedCard.instanceId, slotId))
     } else if (selectedCard.cardType === 'therapy' && ownerId === viewer.id) {
-      triggerGhost(`hand-card-${selectedCard.instanceId}`, `slot-${slotId}`, selectedCard)
+      audioManager.play('click')
+      triggerGhost(`hand-card-${selectedCard.instanceId}`, `slot-${slotId}`, selectedCard, 'card', () => {
+        audioManager.play('therapy-play')
+      })
       executeCommand(() => props.onPlayTherapy(selectedCard.instanceId, slotId))
     } else if (selectedCard.cardType === 'episode' && ownerId !== viewer.id) {
-      triggerGhost(`hand-card-${selectedCard.instanceId}`, `slot-${slotId}`, selectedCard)
+      audioManager.play('click')
+      triggerGhost(`hand-card-${selectedCard.instanceId}`, `slot-${slotId}`, selectedCard, 'card', () => {
+        audioManager.play('episode')
+      })
       executeCommand(() => props.onPlayEpisode(selectedCard.instanceId, ownerId, slotId))
     }
   }
 
   const handleTargetOpponent = (opponentId: string) => {
     if (!selectedCard || isLocked || !isViewerTurn) {
+      audioManager.play('click')
       setFocusedOpponentId(opponentId) // Just focus if not targeting
       return
     }
 
     if (selectedCard.cardType === 'disorder') {
-      triggerGhost(`hand-card-${selectedCard.instanceId}`, `avatar-${opponentId}`, selectedCard)
+      triggerGhost(`hand-card-${selectedCard.instanceId}`, `avatar-${opponentId}`, selectedCard, 'card', () => {
+        audioManager.play('disorder-play')
+      })
       executeCommand(() => props.onPlayDisorder(selectedCard.instanceId, opponentId))
     } else {
+      audioManager.play('click')
       setFocusedOpponentId(opponentId)
     }
   }
@@ -279,6 +297,7 @@ export function GameBoard(props: GameBoardProps) {
         <div className="deck-area">
           <button id="deck-draw" type="button" className="draw-pile" style={{ padding: 0, background: 'none', border: 'none' }} onClick={() => {
             if (!isLocked) {
+              audioManager.play('draw')
               triggerGhost('deck-draw', 'own-hand', undefined, 'cardback')
               props.onDraw()
             }
@@ -326,6 +345,7 @@ export function GameBoard(props: GameBoardProps) {
                     card={card}
                     selected={card.instanceId === selectedCardId}
                     onClick={() => {
+                      audioManager.play('click')
                       if (selectedCardId === card.instanceId) setSelectedCardId(undefined)
                       else setSelectedCardId(card.instanceId)
                     }}
@@ -340,6 +360,7 @@ export function GameBoard(props: GameBoardProps) {
               <button type="button" className="primary action-btn" onClick={() => {
                 const currentId = selectedCardId
                 if (currentId) {
+                  audioManager.play('discard')
                   triggerGhost(`hand-card-${currentId}`, 'deck-discard', selectedCard)
                   executeCommand(() => props.onDiscard(currentId))
                 }
@@ -351,13 +372,17 @@ export function GameBoard(props: GameBoardProps) {
               type="button"
               className="primary action-btn end-turn-btn"
               disabled={!isViewerTurn || game.turn.phase !== 'play' || isLocked}
-              onClick={() => executeCommand(props.onEndTurn)}
+              onClick={() => {
+                audioManager.play('click')
+                executeCommand(props.onEndTurn)
+              }}
             >
               {t('endTurn')}
             </button>
-            <button className="log-icon-btn" type="button" onClick={(e) => { e.stopPropagation(); setShowLog(!showLog); }} aria-label={t('gameLog')}>
+            <button className="log-icon-btn" type="button" onClick={(e) => { e.stopPropagation(); audioManager.play('click'); setShowLog(!showLog); }} aria-label={t('gameLog')}>
               📜
             </button>
+            <AudioSettings />
           </div>
         </div>
       </section>

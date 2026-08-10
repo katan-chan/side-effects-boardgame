@@ -12,6 +12,7 @@ export interface GhostItem {
   endRect: DOMRect
   card?: GhostCardType
   type: 'card' | 'cardback'
+  onLand?: () => void
 }
 
 let nextId = 0
@@ -21,9 +22,10 @@ export type GhostListener = (ghost: GhostItem) => void
 const listeners = new Set<GhostListener>()
 export const __test_listeners = listeners
 
-export function triggerGhost(startId: string, endId: string, card?: GhostCardType, type: 'card' | 'cardback' = 'card') {
+export function triggerGhost(startId: string, endId: string, card?: GhostCardType, type: 'card' | 'cardback' = 'card', onLand?: () => void) {
   if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     console.debug('Ghost animation skipped due to prefers-reduced-motion')
+    onLand?.()
     return
   }
 
@@ -32,6 +34,7 @@ export function triggerGhost(startId: string, endId: string, card?: GhostCardTyp
 
   if (!startEl || !endEl) {
     console.debug(`Ghost animation skipped due to missing DOM element: ${!startEl ? startId : ''} ${!endEl ? endId : ''}`)
+    onLand?.()
     return
   }
 
@@ -39,7 +42,7 @@ export function triggerGhost(startId: string, endId: string, card?: GhostCardTyp
   const endRect = endEl.getBoundingClientRect()
 
   const id = `ghost-${nextId++}`
-  const ghost = { id, startRect, endRect, card, type }
+  const ghost = { id, startRect, endRect, card, type, onLand }
   listeners.forEach(fn => fn(ghost))
 }
 
@@ -77,6 +80,10 @@ function GhostElement({ ghost, onComplete }: { ghost: GhostItem, onComplete: (id
       })
     })
 
+    const timerLand = setTimeout(() => {
+      ghost.onLand?.()
+    }, 350)
+
     const timer = setTimeout(() => {
       onComplete(ghost.id)
     }, 550)
@@ -84,6 +91,7 @@ function GhostElement({ ghost, onComplete }: { ghost: GhostItem, onComplete: (id
     return () => {
       cancelAnimationFrame(frame1)
       cancelAnimationFrame(frame2)
+      clearTimeout(timerLand)
       clearTimeout(timer)
     }
   }, [ghost, onComplete])
