@@ -13,6 +13,7 @@ import {
   endTurn as endTurnCommand,
 } from '../game/engine/turns'
 import type { GameState } from '../game/engine/types'
+import { t } from '../i18n'
 
 type StoreAction = (game: GameState) => GameState
 type LogDescription = (before: GameState, after: GameState) => string
@@ -63,7 +64,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         gameLog: [
           ...get().gameLog,
           ...(entry ? [entry] : []),
-          ...(winner ? [`${winner.name} won the game.`] : []),
+          ...(winner ? [t('wins', { player: winner.name })] : []),
         ].slice(-30),
       })
     } catch (error) {
@@ -80,7 +81,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         set({
           gameState: createGame(playerNames),
           error: undefined,
-          gameLog: ['Local game started.'],
+          gameLog: [t('logLocalStarted')],
         })
       } catch (error) {
         set({ error: errorMessage(error) })
@@ -90,7 +91,7 @@ export const useGameStore = create<GameStore>((set, get) => {
       run(
         (game) => drawForTurn(game, game.currentPlayerId),
         (before, after) =>
-          `${before.players[before.currentPlayerIndex].name} drew ${after.turn.cardsDrawnThisTurn - before.turn.cardsDrawnThisTurn} cards.`,
+          t('logDrew', { player: before.players[before.currentPlayerIndex].name, count: after.turn.cardsDrawnThisTurn - before.turn.cardsDrawnThisTurn }),
       ),
     playDrug: (drugCardId, disorderCardId) =>
       run(
@@ -102,7 +103,7 @@ export const useGameStore = create<GameStore>((set, get) => {
             disorderCardId,
           ),
         (before) =>
-          `${before.players[before.currentPlayerIndex].name} played a Drug treatment.`,
+          t('logDrug', { player: before.players[before.currentPlayerIndex].name }),
       ),
     playDisorder: (disorderCardId, targetPlayerId) =>
       run(
@@ -114,7 +115,7 @@ export const useGameStore = create<GameStore>((set, get) => {
             targetPlayerId,
           ),
         (before) =>
-          `${before.players[before.currentPlayerIndex].name} gave a Disorder to an opponent.`,
+          t('logDisorder', { player: before.players[before.currentPlayerIndex].name }),
       ),
     playEpisode: (
       episodeCardId,
@@ -133,7 +134,7 @@ export const useGameStore = create<GameStore>((set, get) => {
             options,
           ),
         (before) =>
-          `${before.players[before.currentPlayerIndex].name} triggered an Episode.`,
+          t('logEpisode', { player: before.players[before.currentPlayerIndex].name }),
       ),
     playTherapy: (therapyCardId, disorderCardId) =>
       run(
@@ -145,20 +146,20 @@ export const useGameStore = create<GameStore>((set, get) => {
             disorderCardId,
           ),
         (before) =>
-          `${before.players[before.currentPlayerIndex].name} used Therapy.`,
+          t('logTherapy', { player: before.players[before.currentPlayerIndex].name }),
       ),
     discard: (cardInstanceId) =>
       run(
         (game) =>
           discardCardCommand(game, game.currentPlayerId, cardInstanceId),
         (before) =>
-          `${before.players[before.currentPlayerIndex].name} discarded a card.`,
+          t('logDiscard', { player: before.players[before.currentPlayerIndex].name }),
       ),
     endTurn: () =>
       run(
         (game) => endTurnCommand(game, game.currentPlayerId),
         (before) =>
-          `${before.players[before.currentPlayerIndex].name} ended their turn.`,
+          t('logEndTurn', { player: before.players[before.currentPlayerIndex].name }),
       ),
     resetGame: () =>
       set({ gameState: undefined, error: undefined, gameLog: [] }),

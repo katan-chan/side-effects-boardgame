@@ -37,6 +37,17 @@ describe('local UI adapter', () => {
     )
   })
 
+  it('writes Vietnamese-only local game log entries', () => {
+    resetStore()
+    useGameStore.getState().createLocalGame(['Ada', 'Ben'])
+    expect(useGameStore.getState().gameLog).toEqual([
+      'Ván chơi cùng máy đã bắt đầu.',
+    ])
+
+    useGameStore.getState().draw()
+    expect(useGameStore.getState().gameLog.at(-1)).toMatch(/đã rút \d+ lá/)
+  })
+
   it('delegates a play action to the domain engine', () => {
     resetStore()
     useGameStore.getState().createLocalGame(['Ada', 'Ben'])

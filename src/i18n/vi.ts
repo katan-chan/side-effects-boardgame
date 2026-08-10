@@ -20,6 +20,8 @@ export const vi: Translation = {
     anxietyChoice: 'Lo âu: chọn một lá bài ẩn', tremorsChoice: 'Run rẩy: bỏ 3 lá bài', discardThree: 'Bỏ 3 lá bài',
     waitingDecision: 'Đang chờ người chơi xử lý {effect}.', treatLabel: 'Điều trị', mayCause: 'Có thể gây',
     phaseDraw: 'Rút bài', phasePlay: 'Chơi bài', phaseDiscard: 'Bỏ bài',
+    cancelSelection: 'Hủy chọn',
+    logLocalStarted: 'Ván chơi cùng máy đã bắt đầu.', logDrew: '{player} đã rút {count} lá.', logDrug: '{player} đã điều trị một Rối loạn.', logDisorder: '{player} đã gây một Rối loạn cho đối thủ.', logEpisode: '{player} đã kích hoạt một Cơn phát bệnh.', logTherapy: '{player} đã dùng Trị liệu.', logDiscard: '{player} đã bỏ một lá bài.', logEndTurn: '{player} đã kết thúc lượt.',
   },
   disorders: { madness: 'Loạn trí', 'suicidal-thoughts': 'Ý nghĩ tự sát', depression: 'Trầm cảm', tremors: 'Run rẩy', 'gambling-addiction': 'Nghiện cờ bạc', anxiety: 'Lo âu', impotence: 'Rối loạn cương dương', anorexia: 'Chán ăn tâm thần' },
   cardTypes: { disorder: 'Rối loạn', drug: 'Thuốc', episode: 'Cơn phát bệnh', therapy: 'Trị liệu' },

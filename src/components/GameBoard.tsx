@@ -46,17 +46,30 @@ interface GameBoardProps {
   onPlayTherapy: (therapyId: string, disorderId: string) => void
 }
 
-function Psyche({ player }: { player: BoardPlayer }) {
+function Psyche({
+  player,
+  selectedId,
+  onSelect,
+}: {
+  player: BoardPlayer
+  selectedId?: string
+  onSelect?: (slotId: string) => void
+}) {
   return (
     <div className="psyche">
       {slotsOf(player).map((slot) => (
-        <div className="slot" key={slot.disorder.instanceId}>
+        <button
+          type="button"
+          className={`slot ${selectedId === slot.disorder.instanceId ? 'target-selected' : ''} ${onSelect ? 'targetable' : ''}`}
+          key={slot.disorder.instanceId}
+          onClick={() => onSelect?.(slot.disorder.instanceId)}
+        >
           <strong>{cardName(slot.disorder.definitionId, slot.disorder.displayName)}</strong>
           <span className={slot.drug ? 'treated' : 'untreated'}>
             {slot.drug ? t('treated') : t('untreated')}
           </span>
           {slot.drug && <small>{cardName(slot.drug.definitionId, slot.drug.displayName)}</small>}
-        </div>
+        </button>
       ))}
     </div>
   )
@@ -116,29 +129,12 @@ export function GameBoard(props: GameBoardProps) {
     setChosenCardId(undefined)
     setTremorsIds([])
   }
-  const targetPlayerControl = (
-    <label>
-      {t('targetPlayer')}
-      <select
-        value={targetPlayerId ?? ''}
-        onChange={(event) => {
-          setTargetPlayerId(event.target.value || undefined)
-          setTargetDisorderId(undefined)
-          setChosenCardId(undefined)
-          setTremorsIds([])
-        }}
-      >
-        <option value="">{t('selectOpponent')}</option>
-        {game.players
-          .filter((player) => player.id !== viewer.id)
-          .map((player) => (
-            <option key={player.id} value={player.id}>
-              {player.name}
-            </option>
-          ))}
-      </select>
-    </label>
-  )
+  const selectPlayer = (playerId: string) => {
+    setTargetPlayerId(playerId)
+    setTargetDisorderId(undefined)
+    setChosenCardId(undefined)
+    setTremorsIds([])
+  }
 
   useEffect(() => {
     if (
@@ -165,31 +161,10 @@ export function GameBoard(props: GameBoardProps) {
         </button>
       )
     if (game.turn.phase !== 'play') return <p>{t('drawBeforePlay')}</p>
-    const ownSelector = (
-      <label>
-        {t('ownUntreatedDisorder')}
-        <select
-          value={targetDisorderId ?? ''}
-          onChange={(event) =>
-            setTargetDisorderId(event.target.value || undefined)
-          }
-        >
-          <option value="">{t('chooseDisorder')}</option>
-          {untreatedOwn.map((slot) => (
-            <option
-              key={slot.disorder.instanceId}
-              value={slot.disorder.instanceId}
-            >
-              {cardName(slot.disorder.definitionId, slot.disorder.displayName)}
-            </option>
-          ))}
-        </select>
-      </label>
-    )
     if (selectedCard.cardType === 'drug')
       return (
         <>
-          {ownSelector}
+          <p>{t('ownUntreatedDisorder')}</p>
           <button
             type="button"
             className="primary"
@@ -206,7 +181,7 @@ export function GameBoard(props: GameBoardProps) {
     if (selectedCard.cardType === 'therapy')
       return (
         <>
-          {ownSelector}
+          <p>{t('ownUntreatedDisorder')}</p>
           <button
             type="button"
             className="primary"
@@ -223,7 +198,7 @@ export function GameBoard(props: GameBoardProps) {
     if (selectedCard.cardType === 'disorder')
       return (
         <>
-          {targetPlayerControl}
+          <p>{t('selectOpponent')}</p>
           <button
             type="button"
             className="primary"
@@ -248,30 +223,7 @@ export function GameBoard(props: GameBoardProps) {
       isTremors && targetHand.length >= 3 && tremorsIds.length !== 3
     return (
       <>
-        {targetPlayerControl}
-        {target && (
-          <label>
-            {t('targetUntreatedDisorder')}
-            <select
-              value={targetDisorderId ?? ''}
-              onChange={(event) => {
-                setTargetDisorderId(event.target.value || undefined)
-                setChosenCardId(undefined)
-                setTremorsIds([])
-              }}
-            >
-              <option value="">{t('chooseDisorder')}</option>
-              {untreatedTarget.map((slot) => (
-                <option
-                  key={slot.disorder.instanceId}
-                  value={slot.disorder.instanceId}
-                >
-                  {cardName(slot.disorder.definitionId, slot.disorder.displayName)}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
+        <p>{target ? t('targetUntreatedDisorder') : t('selectOpponent')}</p>
         {isAnxiety && target && targetHand.length > 0 && (
           <label>
             {t('takeCard')}
@@ -365,8 +317,16 @@ export function GameBoard(props: GameBoardProps) {
       <section className="players">
         {game.players.map((player) => (
           <article
-            className={`player panel ${player.id === current.id ? 'current-player' : ''} ${player.id === viewer.id ? 'viewer-player' : ''}`}
+            className={`player panel ${player.id === current.id ? 'current-player' : ''} ${player.id === viewer.id ? 'viewer-player' : ''} ${selectedCard && player.id !== viewer.id && (selectedCard.cardType === 'disorder' || selectedCard.cardType === 'episode') ? 'targetable player-target' : ''} ${targetPlayerId === player.id ? 'target-selected' : ''}`}
             key={player.id}
+            onClick={() => {
+              if (
+                selectedCard &&
+                player.id !== viewer.id &&
+                (selectedCard.cardType === 'disorder' || selectedCard.cardType === 'episode')
+              )
+                selectPlayer(player.id)
+            }}
           >
             <h2 data-initial={player.name.slice(0, 1).toUpperCase()}>{player.name}</h2>
             <p>{t('hand')}: {handOf(player).length}</p>
@@ -383,7 +343,23 @@ export function GameBoard(props: GameBoardProps) {
                   `${t('cannotPlay')} ×${player.effects.cannotPlayTurns}`}
               </p>
             )}
-            <Psyche player={player} />
+            <Psyche
+              player={player}
+              selectedId={
+                (selectedCard?.cardType === 'drug' || selectedCard?.cardType === 'therapy') && player.id === viewer.id
+                  ? targetDisorderId
+                  : selectedCard?.cardType === 'episode' && player.id === targetPlayerId
+                    ? targetDisorderId
+                    : undefined
+              }
+              onSelect={
+                (selectedCard?.cardType === 'drug' || selectedCard?.cardType === 'therapy') && player.id === viewer.id
+                  ? setTargetDisorderId
+                  : selectedCard?.cardType === 'episode' && player.id === targetPlayerId
+                    ? setTargetDisorderId
+                    : undefined
+              }
+            />
           </article>
         ))}
       </section>
@@ -400,6 +376,11 @@ export function GameBoard(props: GameBoardProps) {
           ))}
         </div>
         <div className="action-panel">{actionPanel}</div>
+        {selectedCard && (
+          <button type="button" className="cancel-selection" onClick={resetChoice}>
+            {t('cancelSelection')}
+          </button>
+        )}
       </section>
       <section className="game-log panel">
         <h2>{t('gameLog')}</h2>
