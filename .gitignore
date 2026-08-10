@@ -151,3 +151,5 @@ dist-server/
 # Supabase local CLI state (migrations stay tracked)
 supabase/.branches/
 supabase/.temp/
+
+.env
