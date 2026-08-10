@@ -1,36 +1,76 @@
-# side-effects-boardgame
-A web-based adaptation of the Side Effects card game for playing with friends.
+# Side Effects Boardgame
 
-## Development
+Side Effects Boardgame is a real-time multiplayer card game built with React, Vite, TypeScript, Socket.IO, and optional Supabase persistence.
+
+The current codebase includes:
+
+- a browser-based client in `src/`
+- a Socket.IO game server in `server/`
+- game rules and card logic in `src/game/`
+- automated tests for both client and server behavior
+
+## Documentation
+
+- [Project overview and architecture](design/00_overview.md)
+- [Client architecture](design/01_client_architecture.md)
+- [Server architecture](design/02_server_architecture.md)
+- [Game flow and rules](design/03_game_flow.md)
+- [UI and interaction rules](design/04_ui_guidelines.md)
+- [Testing and quality notes](design/05_testing_and_quality.md)
+- [Development guide](docs/development.md)
+- [Deployment guide](docs/deployment.md)
+- [Troubleshooting guide](docs/troubleshooting.md)
+- [Changelog](CHANGELOG.md)
+- [License](LICENSE)
+
+## Quick Start
 
 ```bash
 npm install
-npm run dev:server
-npm run dev:client
+npm run dev
 ```
 
-Copy `.env.example` to `.env.local` to override defaults. The client reads
-`VITE_MULTIPLAYER_SERVER_URL`; the server reads `PORT` and `CLIENT_ORIGIN`.
+In a second terminal:
 
-## Production
+```bash
+npm run dev:server
+```
+
+## Build and Run
 
 ```bash
 npm run build
 npm run server:start
 ```
 
-Host the `dist/` frontend separately and set `VITE_MULTIPLAYER_SERVER_URL` at
-build time to the server URL. Set `CLIENT_ORIGIN` to that frontend origin.
+## Scripts
 
-For durable online rooms, create a Supabase project, run
-`supabase/migrations/001_initial.sql`, then set server-only `SUPABASE_URL` and
-`SUPABASE_SECRET_KEY`. Production startup requires both variables; development
-uses in-memory persistence when they are absent.
+- `npm run dev` - start the Vite client
+- `npm run dev:server` - start the server in watch mode
+- `npm run build` - build the client and server bundles
+- `npm run server:start` - run the production server bundle
+- `npm run test` - run the test suite
+- `npm run lint` - run ESLint
+- `npm run format` - run Prettier
 
-## Multiplayer sessions
+## Project Structure
 
-The server issues each room participant an opaque session credential and stores
-only its hash in room snapshots. Browsers retain the credential in
-`sessionStorage` so a reload can resume the same slot. A lost credential cannot
-be recovered in v1. Snapshots created before session-auth schema v2 are skipped
-on restore rather than falling back to playerId-only reconnects.
+```text
+src/        client UI, state, game engine, audio, and tests
+server/     Socket.IO server, room management, persistence, and tests
+supabase/   SQL migration for optional durable room storage
+design/     architecture and product design notes
+docs/       developer and operational documentation
+.github/    issue templates, PR template, and CI workflow
+```
+
+## Contributing
+
+1. Fork or branch from the current repository.
+2. Make the change in a focused commit.
+3. Run the tests and build before opening a pull request.
+4. Update docs when you change behavior or public commands.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
