@@ -2,7 +2,7 @@ import type { Translation } from './types'
 
 export const vi: Translation = {
   strings: {
-    title: 'Tác Dụng Phụ', chooseMode: 'Chọn cách chơi.', localGame: 'Chơi cùng máy', onlineGame: 'Chơi trực tuyến',
+    title: 'Side Effect', chooseMode: 'Chọn cách chơi.', localGame: 'Chơi cùng máy', onlineGame: 'Chơi trực tuyến',
     back: 'Quay lại', player: 'Người chơi', remove: 'Xóa', addPlayer: 'Thêm người chơi', startGame: 'Bắt đầu',
     enterPlayers: 'Nhập từ 2 đến 8 tên người chơi không để trống.', displayName: 'Tên người chơi', roomCode: 'Mã phòng',
     createRoom: 'Tạo phòng', joinRoom: 'Vào phòng', host: 'Chủ phòng', connected: 'Đã kết nối', disconnected: 'Mất kết nối',

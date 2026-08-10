@@ -74,7 +74,7 @@ function CardButton({
   return (
     <button
       type="button"
-      className={`card ${selected ? 'selected' : ''}`}
+      className={`card card-${card.cardType} ${selected ? 'selected' : ''}`}
       onClick={onClick}
     >
       <small>{cardTypeName(card.cardType)}</small>
@@ -357,14 +357,18 @@ export function GameBoard(props: GameBoardProps) {
         <span>{t('drawPile')}: {drawPileCount}</span>
         <span>{t('discardPile')}: {discardPileCount}</span>
       </header>
+      <section className="deck-area" aria-label={`${t('drawPile')} và ${t('discardPile')}`}>
+        <div className="deck-stack draw-stack"><span>{t('drawPile')}</span><strong>{drawPileCount}</strong></div>
+        <div className="deck-stack discard-stack"><span>{t('discardPile')}</span><strong>{discardPileCount}</strong></div>
+      </section>
       {props.error && <p className="error">{localizeError(props.error)}</p>}
       <section className="players">
         {game.players.map((player) => (
           <article
-            className={`player panel ${player.id === current.id ? 'current-player' : ''}`}
+            className={`player panel ${player.id === current.id ? 'current-player' : ''} ${player.id === viewer.id ? 'viewer-player' : ''}`}
             key={player.id}
           >
-            <h2>{player.name}</h2>
+            <h2 data-initial={player.name.slice(0, 1).toUpperCase()}>{player.name}</h2>
             <p>{t('hand')}: {handOf(player).length}</p>
             {(player.effects.skipTurns > 0 ||
               player.effects.skipDrawTurns > 0 ||
@@ -383,7 +387,7 @@ export function GameBoard(props: GameBoardProps) {
           </article>
         ))}
       </section>
-      <section className="hand panel">
+      <section className="hand panel own-hand">
         <h2>{t('hand')} — {viewer.name}</h2>
         <div className="cards">
           {viewerHand.map((card) => (
@@ -405,7 +409,7 @@ export function GameBoard(props: GameBoardProps) {
           ))}
         </ol>
       </section>
-      <footer className="button-row">
+      <footer className="button-row action-bar">
         <button
           type="button"
           disabled={!isViewerTurn || game.turn.phase !== 'draw'}
