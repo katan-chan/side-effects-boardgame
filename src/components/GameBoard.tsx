@@ -175,6 +175,7 @@ export function GameBoard(props: GameBoardProps) {
     drug?: BoardCard
   }>()
   const [showLog, setShowLog] = useState(false)
+  const [focusedOpponentId, setFocusedOpponentId] = useState<string>()
   const selectedCard = viewerHand.find(
     (card) => card.instanceId === selectedCardId,
   )
@@ -184,6 +185,11 @@ export function GameBoard(props: GameBoardProps) {
     ? slotsOf(target).filter((slot) => !slot.drug)
     : []
   const targetHand = target ? handOf(target) : []
+  const opponents = game.players.filter((player) => player.id !== viewer.id)
+  const focusedOpponent =
+    opponents.find((player) => player.id === focusedOpponentId) ??
+    opponents.find((player) => player.id === game.currentPlayerId) ??
+    opponents[0]
   const resetChoice = () => {
     setSelectedCardId(undefined)
     setTargetDisorderId(undefined)
@@ -205,6 +211,11 @@ export function GameBoard(props: GameBoardProps) {
       resetChoice()
     }
   }, [viewer.id, viewerHand, selectedCardId])
+
+  useEffect(() => {
+    if (focusedOpponent && focusedOpponent.id !== focusedOpponentId)
+      setFocusedOpponentId(focusedOpponent.id)
+  }, [focusedOpponent, focusedOpponentId])
 
   const actionPanel = useMemo(() => {
     if (!selectedCard) return <p>{t('selectCard')}</p>
@@ -339,10 +350,10 @@ export function GameBoard(props: GameBoardProps) {
         <CardBack label={t('discardPile')} count={discardPileCount} />
       </section>
       {props.error && <p className="error">{localizeError(props.error)}</p>}
-      <section className="players">
+      <section className="players focused-table">
         {game.players.map((player) => (
           <article
-            className={`player panel ${player.id === current.id ? 'current-player' : ''} ${player.id === viewer.id ? 'viewer-player' : ''} ${selectedCard?.cardType === 'disorder' && player.id !== viewer.id ? 'targetable player-target' : ''} ${targetPlayerId === player.id ? 'target-selected' : ''}`}
+            className={`player panel ${player.id === current.id ? 'current-player' : ''} ${player.id === viewer.id ? 'viewer-player' : ''} ${selectedCard?.cardType === 'disorder' && player.id !== viewer.id ? 'targetable player-target' : ''} ${targetPlayerId === player.id ? 'target-selected' : ''} ${game.players.length > 2 && player.id !== viewer.id && player.id !== focusedOpponent?.id ? 'seat-only' : ''}`}
             key={player.id}
             onClick={() => {
               if (
@@ -352,7 +363,7 @@ export function GameBoard(props: GameBoardProps) {
               ) {
                 props.onPlayDisorder(selectedCard.instanceId, player.id)
                 resetChoice()
-              }
+              } else if (player.id !== viewer.id) setFocusedOpponentId(player.id)
             }}
           >
             <h2 data-initial={player.name.slice(0, 1).toUpperCase()}>{player.name}</h2>
@@ -370,7 +381,7 @@ export function GameBoard(props: GameBoardProps) {
                   `${t('cannotPlay')} ×${player.effects.cannotPlayTurns}`}
               </p>
             )}
-            <Psyche
+            {(game.players.length <= 2 || player.id === viewer.id || player.id === focusedOpponent?.id) && <Psyche
               player={player}
               playerId={player.id}
               selectedId={
@@ -418,7 +429,7 @@ export function GameBoard(props: GameBoardProps) {
                 }
               }}
               onInspect={(slot) => setInspectedSlot(slot)}
-            />
+            />}
           </article>
         ))}
       </section>
@@ -454,11 +465,6 @@ export function GameBoard(props: GameBoardProps) {
             />
           ))}
         </div>
-        {selectedCard && (
-          <section className="card-detail" aria-live="polite">
-            <GameCard card={selectedCard} expanded />
-          </section>
-        )}
         <div className="action-panel">{actionPanel}</div>
         {selectedCard && (
           <button type="button" className="cancel-selection" onClick={resetChoice}>

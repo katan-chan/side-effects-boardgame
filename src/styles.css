@@ -30,7 +30,7 @@ button:disabled { cursor: not-allowed; opacity: .42; }
 .status-bar strong { color: #9bf6e5; margin-right: auto; }
 .deck-area { display: flex; justify-content: center; gap: 1rem; }
 .card-back { width: 8.4rem; min-height: 5.4rem; display: grid; place-items: center; align-content: center; gap: .08rem; border-radius: .9rem; border: 1px solid #7baaa0; background: repeating-linear-gradient(135deg, #1a6960 0 8px, #154d48 8px 16px); box-shadow: 5px 5px 0 #05100f, 9px 9px 0 #102926; overflow: hidden; }.card-back-mark { font-size: 1.35rem; color: #b8fff0; }.card-back small { font-size: .65rem; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; }.card-back strong { font-size: 1.35rem; }
-.players { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.1rem; }
+.players { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.1rem; }.focused-table .seat-only { align-self: start; min-height: 0; cursor: pointer; }.focused-table .seat-only .psyche { display: none; }.focused-table .seat-only h2 { font-size: .9rem; }.focused-table .seat-only p { margin: .15rem 0; font-size: .8rem; }
 .player { min-width: 0; padding: 0; background: transparent; border: 0; box-shadow: none; }
 .player h2 { display: flex; align-items: center; gap: .5rem; margin: 0 0 .35rem; font-size: 1.05rem; }
 .player h2::before { content: attr(data-initial); display: grid; place-items: center; width: 1.8rem; height: 1.8rem; border-radius: 50%; background: #2b625a; color: #d7fff6; font-size: .8rem; }
