@@ -4,6 +4,14 @@ import type { PlayerGameView } from '../../server/game/playerView'
 
 const PLAYER_ID_KEY = 'side-effects.player-id'
 const SESSION_KEY = 'side-effects.room-session'
+export const multiplayerServerUrl =
+  import.meta.env.VITE_MULTIPLAYER_SERVER_URL ?? 'http://localhost:3001'
+
+export type ConnectionState =
+  | 'connecting'
+  | 'connected'
+  | 'disconnected'
+  | 'unavailable'
 
 export interface RoomView {
   id: string
@@ -23,6 +31,7 @@ export interface MultiplayerClientHandlers {
   onError?: (message: string) => void
   onSessionRestored?: (session: MultiplayerSession) => void
   onGameLog?: (entries: string[]) => void
+  onConnectionState?: (state: ConnectionState) => void
 }
 
 function storage(): Storage | undefined {
@@ -69,13 +78,19 @@ export function createMultiplayerClient(
     handlers.onSessionRestored?.(session)
   })
   socket.on('connect', () => {
+    handlers.onConnectionState?.('connected')
     const session = getSavedSession()
     if (session?.playerId === playerId) socket.emit('session:resume', session)
   })
+  socket.on('disconnect', () => handlers.onConnectionState?.('disconnected'))
+  socket.on('connect_error', () => handlers.onConnectionState?.('unavailable'))
 
   return {
     playerId,
-    connect: () => socket.connect(),
+    connect: () => {
+      handlers.onConnectionState?.('connecting')
+      socket.connect()
+    },
     disconnect: () => socket.disconnect(),
     createRoom: (displayName: string) =>
       socket.emit('room:create', { displayName, playerId }),

@@ -40,6 +40,13 @@ export function registerSocketHandlers(io: Server, rooms: RoomService): void {
       'game:error',
       error instanceof Error ? error.message : 'Unable to process request.',
     )
+  const activeSession = (socket: Socket): Session => {
+    const session = sessions.get(socket.id)
+    if (!session) throw new Error('Join a room first.')
+    if (!rooms.isActiveSocket(session.roomId, session.playerId, socket.id))
+      throw new Error('This socket session is no longer active.')
+    return session
+  }
 
   io.on('connection', (socket) => {
     socket.on(
@@ -108,8 +115,7 @@ export function registerSocketHandlers(io: Server, rooms: RoomService): void {
 
     socket.on('room:start', () => {
       try {
-        const session = sessions.get(socket.id)
-        if (!session) throw new Error('Join a room first.')
+        const session = activeSession(socket)
         const room = rooms.startRoom(session.roomId, session.playerId)
         broadcastRoom(room)
         broadcastGame(room)
@@ -120,8 +126,7 @@ export function registerSocketHandlers(io: Server, rooms: RoomService): void {
 
     socket.on('game:command', (command: GameCommand) => {
       try {
-        const session = sessions.get(socket.id)
-        if (!session) throw new Error('Join a room first.')
+        const session = activeSession(socket)
         rooms.executeCommand(session.roomId, session.playerId, command)
         const room = rooms.getRoom(session.roomId)!
         broadcastRoom(room)
@@ -139,10 +144,9 @@ export function registerSocketHandlers(io: Server, rooms: RoomService): void {
       }: {
         decisionId: string
         choiceIds: string[]
-      }) => {
+        }) => {
         try {
-          const session = sessions.get(socket.id)
-          if (!session) throw new Error('Join a room first.')
+          const session = activeSession(socket)
           rooms.resolveDecision(
             session.roomId,
             session.playerId,
@@ -163,7 +167,11 @@ export function registerSocketHandlers(io: Server, rooms: RoomService): void {
       sessions.delete(socket.id)
       if (!session) return
       try {
-        const room = rooms.markDisconnected(session.roomId, session.playerId)
+        const room = rooms.markDisconnected(
+          session.roomId,
+          session.playerId,
+          socket.id,
+        )
         broadcastRoom(room)
       } catch {
         // The in-memory room may already have been removed from a lobby leave.

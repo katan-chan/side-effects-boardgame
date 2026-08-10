@@ -7,7 +7,9 @@
     "dev": "vite",
     "dev:client": "vite",
     "dev:server": "tsx watch server/index.ts",
-    "build": "tsc -b && vite build && tsc -p tsconfig.server.json",
+    "build:server": "tsc -p tsconfig.server.json && node -e \"require('node:fs').writeFileSync('dist-server/package.json', '{\\\"type\\\":\\\"commonjs\\\"}')\"",
+    "build": "tsc -b && vite build && npm run build:server",
+    "server:start": "node dist-server/server/index.js",
     "test": "vitest run",
     "lint": "eslint .",
     "format": "prettier --write ."

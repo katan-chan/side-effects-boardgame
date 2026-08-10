@@ -149,6 +149,9 @@ export class RoomService {
     const decision = room.pendingDecision
     if (!room.gameState || !decision)
       throw new Error('There is no pending decision.')
+    const chooser = room.players.find((player) => player.id === playerId)
+    if (!chooser?.connected)
+      throw new Error('Disconnected players cannot resolve decisions.')
     if (decision.id !== decisionId || decision.chooserPlayerId !== playerId)
       throw new Error('This player cannot resolve that decision.')
     const expectedCount = decision.kind === 'anxiety' ? 1 : 3
@@ -176,6 +179,10 @@ export class RoomService {
     )
     room.pendingDecision = undefined
     room.gameState = nextGame
+    room.gameLog = [
+      ...room.gameLog,
+      this.publicLogEntry(room.gameState, decision.command),
+    ].slice(-30)
     if (nextGame.status === 'finished') room.status = 'finished'
     return nextGame
   }
@@ -193,13 +200,21 @@ export class RoomService {
     return room
   }
 
-  markDisconnected(roomId: string, playerId: string): Room {
+  markDisconnected(roomId: string, playerId: string, socketId?: string): Room {
     const room = this.requireRoom(roomId)
     const player = room.players.find((candidate) => candidate.id === playerId)
     if (!player) throw new Error('Player is not in this room.')
+    if (socketId && player.socketId !== socketId) return room
     player.connected = false
     player.socketId = undefined
     return room
+  }
+
+  isActiveSocket(roomId: string, playerId: string, socketId: string): boolean {
+    const player = this.requireRoom(roomId).players.find(
+      (candidate) => candidate.id === playerId,
+    )
+    return player?.connected === true && player.socketId === socketId
   }
 
   private createPlayer(

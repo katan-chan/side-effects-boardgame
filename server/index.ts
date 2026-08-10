@@ -1,12 +1,9 @@
-import { createServer } from 'node:http'
-import { Server } from 'socket.io'
-import { RoomService } from './rooms/roomService'
-import { registerSocketHandlers } from './socket/registerSocketHandlers'
+import { createGameServer } from './app'
+import { getServerConfig } from './config'
 
-const port = Number(process.env.PORT ?? 3001)
-const httpServer = createServer()
-const io = new Server(httpServer, { cors: { origin: '*' } })
-registerSocketHandlers(io, new RoomService())
+const config = getServerConfig()
+const { httpServer } = createGameServer(config)
+const { port } = config
 httpServer.listen(port, () =>
   console.log(`Side Effects server listening on :${port}`),
 )

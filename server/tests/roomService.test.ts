@@ -68,6 +68,25 @@ describe('authoritative rooms', () => {
     expect(restored.hostPlayerId).toBe(host.id)
   })
 
+  it('ignores a stale socket disconnect after the player has reconnected', () => {
+    const { service, room } = startedRoom()
+    service.resumeSession(room.id, 'ben-id', 'replacement-socket')
+
+    const afterStaleDisconnect = service.markDisconnected(
+      room.id,
+      'ben-id',
+      'old-socket',
+    )
+
+    expect(
+      afterStaleDisconnect.players.find((player) => player.id === 'ben-id'),
+    ).toMatchObject({ connected: true, socketId: 'replacement-socket' })
+    expect(
+      service.isActiveSocket(room.id, 'ben-id', 'replacement-socket'),
+    ).toBe(true)
+    expect(service.isActiveSocket(room.id, 'ben-id', 'old-socket')).toBe(false)
+  })
+
   it('allows only the host to start a valid player-count room', () => {
     const service = new RoomService()
     const { room, player: host } = service.createRoom('Ada')
@@ -114,6 +133,40 @@ describe('authoritative rooms', () => {
     expect(
       result.players.find((player) => player.id === game.currentPlayerId)?.hand,
     ).toHaveLength(6)
+  })
+
+  it('rejects duplicate or stale commands without changing the authoritative game', () => {
+    const { service, room } = startedRoom()
+    const currentPlayerId = room.gameState!.currentPlayerId
+    service.executeCommand(room.id, currentPlayerId, { type: 'draw' })
+    const afterDraw = structuredClone(room.gameState)
+
+    expect(() =>
+      service.executeCommand(room.id, currentPlayerId, { type: 'draw' }),
+    ).toThrow('draw phase')
+    expect(room.gameState).toEqual(afterDraw)
+    expect(room.gameLog).toHaveLength(2)
+  })
+
+  it('waits for a disconnected current player without allowing another player to act', () => {
+    const { service, room } = startedRoom()
+    const currentPlayerId = room.gameState!.currentPlayerId
+    const otherPlayerId = room.gameState!.players.find(
+      (player) => player.id !== currentPlayerId,
+    )!.id
+    service.markDisconnected(room.id, currentPlayerId)
+    const beforeAttempt = structuredClone(room.gameState)
+
+    expect(() =>
+      service.executeCommand(room.id, otherPlayerId, { type: 'draw' }),
+    ).toThrow('current player')
+    expect(room.gameState).toEqual(beforeAttempt)
+
+    service.resumeSession(room.id, currentPlayerId, 'returning-socket')
+    expect(
+      service.executeCommand(room.id, currentPlayerId, { type: 'draw' }).turn
+        .phase,
+    ).toBe('play')
   })
 
   it('projects private hands differently for each viewer while sharing public state', () => {
@@ -189,5 +242,35 @@ describe('authoritative rooms', () => {
     expect(JSON.stringify(attackerView.pendingDecision)).not.toContain(
       target.hand[0].instanceId,
     )
+  })
+
+  it('does not let a disconnected pending chooser resolve an Episode', () => {
+    const { service, room } = startedRoom()
+    const game = room.gameState!
+    const attacker = game.players[game.currentPlayerIndex]
+    const target = game.players.find((player) => player.id !== attacker.id)!
+    room.pendingDecision = {
+      id: 'decision-disconnected',
+      kind: 'anxiety',
+      chooserPlayerId: attacker.id,
+      command: {
+        type: 'playEpisode',
+        episodeCardId: 'episode-01',
+        targetPlayerId: target.id,
+        targetDisorderCardId: target.psyche.slots[0].disorder.instanceId,
+      },
+      choiceMap: { 'choice-1': target.hand[0].instanceId },
+    }
+    service.markDisconnected(room.id, attacker.id)
+
+    expect(() =>
+      service.resolveDecision(
+        room.id,
+        attacker.id,
+        'decision-disconnected',
+        ['choice-1'],
+      ),
+    ).toThrow('Disconnected')
+    expect(room.pendingDecision?.id).toBe('decision-disconnected')
   })
 })

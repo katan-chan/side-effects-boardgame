@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { GameBoard } from './GameBoard'
 import {
   createMultiplayerClient,
+  multiplayerServerUrl,
+  type ConnectionState,
   type MultiplayerSession,
   type RoomView,
 } from '../multiplayer/multiplayerClient'
@@ -19,18 +21,21 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
   const [game, setGame] = useState<PlayerGameView>()
   const [error, setError] = useState<string>()
   const [gameLog, setGameLog] = useState<string[]>([])
+  const [connectionState, setConnectionState] =
+    useState<ConnectionState>('connecting')
   const clientRef = useRef<ReturnType<typeof createMultiplayerClient> | null>(
     null,
   )
 
   useEffect(() => {
     const client = createMultiplayerClient(
-      import.meta.env.VITE_SERVER_URL ?? 'http://localhost:3001',
+      multiplayerServerUrl,
       {
         onRoomState: setRoom,
         onGameState: setGame,
         onError: setError,
         onGameLog: setGameLog,
+        onConnectionState: setConnectionState,
         onSessionRestored: setSession,
       },
     )
@@ -66,6 +71,9 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
               ? 'Your turn'
               : `Waiting for ${currentRoomPlayer?.displayName ?? 'current player'}`}
         </p>
+        {connectionState !== 'connected' && (
+          <p className="error">Server {connectionState}. Reconnecting…</p>
+        )}
         {game.pendingDecision && (
           <PendingDecision
             decision={game.pendingDecision}
@@ -133,6 +141,13 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
           ← Back
         </button>
         <h1>Online Game</h1>
+        {connectionState !== 'connected' && (
+          <p className="error">
+            {connectionState === 'unavailable'
+              ? 'Multiplayer server is unavailable.'
+              : `Server ${connectionState}.`}
+          </p>
+        )}
         {!room && (
           <>
             <label className="name-field">
