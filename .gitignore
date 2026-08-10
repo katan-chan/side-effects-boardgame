@@ -153,3 +153,5 @@ supabase/.branches/
 supabase/.temp/
 
 .env
+
+*.zip
