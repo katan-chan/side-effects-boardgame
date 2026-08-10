@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { GameCard } from '../../components/cards/GameCard'
+import { CardBack } from '../../components/cards/CardBack'
 import { en } from '../../i18n/en'
 
 function render(
@@ -60,5 +61,23 @@ describe('card information presentation', () => {
       'Không thể dùng lên Run rẩy.',
     )
     expect(en.strings.therapyRestriction).toContain('Tremors')
+  })
+
+  it('uses distinct visual frame variants and renders a generic card back', () => {
+    expect(render('madness', 'disorder', 'Madness')).toContain(
+      'card-frame-disorder',
+    )
+    expect(render('anxiety-treatment', 'drug', 'Lorazepam')).toContain(
+      'card-frame-drug',
+    )
+    expect(render('episode', 'episode', "You're Having an Episode")).toContain(
+      'card-frame-episode',
+    )
+    expect(render('therapy', 'therapy', 'Therapy')).toContain(
+      'card-frame-therapy',
+    )
+    expect(
+      renderToStaticMarkup(createElement(CardBack, { label: 'Chồng bài rút', count: 12 })),
+    ).toContain('card-back')
   })
 })

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { CardInstance } from '../game/cards/types'
+import type { CardInstance, DisorderId } from '../game/cards/types'
 import type { GameState, PlayerState } from '../game/engine/types'
 import type {
   PlayerGameView,
@@ -9,6 +9,8 @@ import type {
 } from '../../server/game/playerView'
 import { cardName, localizeError, phaseName, t } from '../i18n'
 import { GameCard } from './cards/GameCard'
+import { CardBack } from './cards/CardBack'
+import { DisorderIcon } from './cards/DisorderIcon'
 
 type BoardCard =
   | Pick<
@@ -91,7 +93,7 @@ function Psyche({
               onSelect?.(playerId, slot.disorder.instanceId)
           }}
         >
-          <strong>{cardName(slot.disorder.definitionId, slot.disorder.displayName)}</strong>
+          <strong><DisorderIcon id={slot.disorder.definitionId as DisorderId} />{cardName(slot.disorder.definitionId, slot.disorder.displayName)}</strong>
           <span className={slot.drug ? 'treated' : 'untreated'}>
             {slot.drug ? t('treated') : t('untreated')}
           </span>
@@ -348,8 +350,8 @@ export function GameBoard(props: GameBoardProps) {
         <span>{t('discardPile')}: {discardPileCount}</span>
       </header>
       <section className="deck-area" aria-label={`${t('drawPile')} và ${t('discardPile')}`}>
-        <div className="deck-stack draw-stack"><span>{t('drawPile')}</span><strong>{drawPileCount}</strong></div>
-        <div className="deck-stack discard-stack"><span>{t('discardPile')}</span><strong>{discardPileCount}</strong></div>
+        <CardBack label={t('drawPile')} count={drawPileCount} />
+        <CardBack label={t('discardPile')} count={discardPileCount} />
       </section>
       {props.error && <p className="error">{localizeError(props.error)}</p>}
       <section className="players">

@@ -1,6 +1,8 @@
 import { getCardDefinition } from '../../game/cards/catalog'
 import type { CardType } from '../../game/cards/types'
 import { cardName, cardTypeName, disorderName, locale, t } from '../../i18n'
+import { CardFrame } from './CardFrame'
+import { DisorderIcon } from './DisorderIcon'
 
 export interface GameCardData {
   definitionId: string
@@ -18,8 +20,14 @@ export function GameCard({
   const definition = getCardDefinition(card.definitionId)
   const name = cardName(card.definitionId, card.displayName)
   return (
-    <div className={`game-card-content ${expanded ? 'expanded-card' : ''}`}>
-      <small className="card-kicker">{cardTypeName(card.cardType)}</small>
+    <CardFrame type={card.cardType}>
+      <div className={`game-card-content ${expanded ? 'expanded-card' : ''}`}>
+      <header className="card-header">
+        <small className="card-kicker">{cardTypeName(card.cardType)}</small>
+        <span className="card-symbol" aria-hidden="true">
+          {definition?.cardType === 'disorder' ? <DisorderIcon id={definition.definitionId} /> : card.cardType === 'drug' ? '✚' : card.cardType === 'episode' ? '⚡' : '◌'}
+        </span>
+      </header>
       <strong className="card-title">{name}</strong>
       {definition?.cardType === 'disorder' && (
         <>
@@ -52,6 +60,7 @@ export function GameCard({
       {expanded && definition?.cardType === 'therapy' && (
         <small className="card-note">{t('therapyRestriction')}</small>
       )}
-    </div>
+      </div>
+    </CardFrame>
   )
 }
