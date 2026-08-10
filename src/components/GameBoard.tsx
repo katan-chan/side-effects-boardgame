@@ -14,7 +14,9 @@ import { canTreatWithTherapy } from '../game/engine/therapy'
 import { GameCard } from './cards/GameCard'
 import { CardBack } from './cards/CardBack'
 import { OpponentAvatarBar } from './OpponentAvatarBar'
+import { OpponentHand } from './OpponentHand'
 import { GameLogDrawer } from './GameLogDrawer'
+import { PlayerSidebar } from './sidebar/PlayerSidebar'
 import { GhostLayer, triggerGhost } from './GhostLayer'
 import { useGameAudio } from '../audio/useGameAudio'
 import { audioManager } from '../audio/audioManager'
@@ -209,6 +211,15 @@ export function GameBoard(props: GameBoardProps) {
       slotsOf(focusedOpponent) as ExposureSlot[],
       selectedDisorderDefinition.definitionId,
     )
+  // The resolved id, not the raw state: before the first click focusedOpponentId
+  // is undefined while an opponent is already being shown, so highlighting off
+  // the raw state would leave the watched player unmarked at game start.
+  const watchedOpponentId = focusedOpponent?.id
+  const watchedHandCount = focusedOpponent
+    ? 'handCount' in focusedOpponent
+      ? focusedOpponent.handCount
+      : (focusedOpponent.hand?.length ?? 0)
+    : 0
 
   useEffect(() => {
     // Unlock interaction when game state changes (server responded)
@@ -285,6 +296,15 @@ export function GameBoard(props: GameBoardProps) {
       className={`game-board ${isTargetingMode ? 'targeting-mode' : ''} ${isLocked ? 'interaction-locked' : ''}`}
       onClick={handleBackgroundClick}
     >
+      <PlayerSidebar
+        player={viewer}
+        isViewerTurn={isViewerTurn}
+        currentPlayerName={current.name}
+        phase={game.turn.phase}
+        cardsPlayedThisTurn={game.turn.cardsPlayedThisTurn}
+        turnNumber={game.turnNumber}
+        gameLog={props.gameLog}
+      />
       <div className="top-actions" onClick={(event) => event.stopPropagation()}>
         {props.onLeave && (
           <button type="button" className="btn-danger top-action-btn" onClick={props.onLeave}>
@@ -310,34 +330,39 @@ export function GameBoard(props: GameBoardProps) {
         {opponents.length > 1 && (
           <OpponentAvatarBar
             opponents={opponents}
-            focusedOpponentId={focusedOpponentId}
+            focusedOpponentId={watchedOpponentId}
             setFocusedOpponentId={handleTargetOpponent}
             targetPlayerId={
               isTargetingMode &&
               selectedCard?.cardType === 'disorder' &&
               canTargetFocusedOpponent
-                ? focusedOpponent.id
+                ? watchedOpponentId
                 : undefined
             }
             currentPlayerId={game.currentPlayerId}
           />
         )}
         {focusedOpponent && (
-          <article 
+          <article
             className={`player opponent-player ${isTargetingMode && selectedCard?.cardType === 'disorder' && canTargetFocusedOpponent ? 'target-highlight targetable' : ''}`}
             onClick={(e) => {
               e.stopPropagation()
               handleTargetOpponent(focusedOpponent.id)
             }}
           >
-            {opponents.length === 1 && (
-              <header className="opponent-header" style={{ marginBottom: '1rem', color: '#9bf6e5', fontWeight: 'bold' }}>
-                {focusedOpponent.name} — {t('hand')}: {'handCount' in focusedOpponent ? focusedOpponent.handCount : focusedOpponent.hand?.length}
-              </header>
-            )}
+            <header className="opponent-header">
+              <strong>{focusedOpponent.name}</strong>
+            </header>
+            <OpponentHand
+              count={watchedHandCount}
+              playerName={focusedOpponent.name}
+              playerId={focusedOpponent.id}
+            />
+            {/* No `focusedOpponent.id === focusedOpponentId` check: that state is
+                undefined until the first click, which hid the button on the
+                opponent already being shown. */}
             {selectedCard?.cardType === 'disorder' &&
               isViewerTurn &&
-              focusedOpponent.id === focusedOpponentId &&
               canTargetFocusedOpponent && (
               <button
                 type="button"

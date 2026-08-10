@@ -1,0 +1,101 @@
+/* ── Hand & Controls ── */
+.hand-and-controls {
+  display: grid;
+  grid-template-columns: var(--controls-space) minmax(0, 1fr) var(--controls-space);
+  align-items: end;
+  width: 100%;
+  position: relative;
+}
+.own-hand {
+  position: relative;
+  z-index: var(--z-hover);
+  grid-column: 2;
+  display: flex;
+  /* safe center (not plain center): in a scroll container, plain centring
+     makes overflow spill off BOTH edges and the first card becomes
+     unreachable. */
+  justify-content: safe center;
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* overflow-x:auto forces overflow-y to auto too, which would clip the
+     selected card's lift. Reserve the lift inside the scroll box and cancel
+     it again in layout so the board's height budget is unchanged. */
+  padding-top: calc(var(--card-h) * 0.3);
+  margin-top: calc(var(--card-h) * -0.3);
+}
+.own-hand::-webkit-scrollbar { display: none; }
+.own-hand .cards {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--hand-gap);
+  padding: 0.5rem 0.5rem 0;
+  justify-content: safe center;
+  min-width: min-content;
+  perspective: 1000px;
+}
+.own-hand .card-button {
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), margin 0.2s, opacity 0.2s;
+  position: relative;
+}
+.own-hand .card-button.selected {
+  transform: translateY(calc(var(--card-h) * -0.26));
+  z-index: calc(var(--z-selected) + 1);
+  box-shadow: 0 0 0 4px var(--teal), 0 14px 22px #0009;
+}
+.selection-hint {
+  position: absolute;
+  bottom: calc(100% + 0.35rem);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-selected);
+  white-space: nowrap;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid rgba(234, 179, 8, 0.55);
+  border-radius: 999px;
+  background: rgba(66, 46, 4, 0.94);
+  color: #fde68a;
+  font-size: 0.72rem;
+}
+
+/* The right gutter (--controls-space) is narrower than the two buttons
+   side by side, so a vertical stack is the deliberate shape here, not an
+   accidental wrap: it lets the gutter stay narrow and leave the hand its
+   width instead of widening the gutter to fit a row. */
+.controls-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+  z-index: var(--z-selected);
+  padding-bottom: 0.5rem;
+  grid-column: 3;
+  justify-self: end;
+  align-self: end;
+}
+.utility-btn { min-height: 2.35rem; padding: 0.45rem 0.75rem; font-size: 0.78rem; }
+.top-actions {
+  position: fixed;
+  top: 0.85rem;
+  right: 0.85rem;
+  z-index: var(--z-drawer);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
+  width: 7rem;
+}
+.top-action-btn { min-height: 2.2rem; padding: 0.4rem 0.55rem; font-size: 0.72rem; }
+.top-action-icon { align-self: flex-end; }
+.top-actions .audio-settings { align-self: flex-end; }
+.top-actions .audio-popover { top: calc(100% + 0.5rem) !important; bottom: auto !important; }
+.apply-card-btn { display: block; margin: 0 auto 0.6rem; font-size: 0.8rem; }
+.action-btn { min-width: 8rem; }
+.log-icon-btn {
+  min-width: 0; min-height: unset;
+  width: 2.7rem; height: 2.7rem;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 1.2rem;
+}

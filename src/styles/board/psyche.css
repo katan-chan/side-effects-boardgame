@@ -1,0 +1,63 @@
+/* ── Psyche Tableaus ── */
+.psyche {
+  display: flex;
+  gap: var(--board-gap);
+  justify-content: center;
+  flex-wrap: wrap;
+  perspective: 1000px;
+}
+.slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0;
+  background: none;
+  border: none;
+  /* fixed track so the badge can never widen the slot */
+  flex: 0 0 var(--slot-w);
+  width: var(--slot-w);
+  min-width: 0;
+  min-height: unset;
+  transition: opacity 0.2s, transform 0.2s;
+  transform-style: preserve-3d;
+}
+.slot.dimmed { opacity: 0.3; pointer-events: none; }
+.slot.target-highlight { opacity: 1; transform: translateY(-4px); z-index: var(--z-hover); }
+.slot.target-highlight > .card-frame-disorder {
+  box-shadow: 0 0 15px rgba(234,179,8,.5);
+  border-color: var(--yellow);
+}
+.slot.anim-pulse-coral { animation: pulse-coral 0.4s ease-out; }
+.slot.anim-pulse-purple { animation: pulse-purple 0.4s ease-out; }
+.slot.anim-pulse-gold { animation: pulse-gold 0.4s ease-out; }
+
+.slot-badge {
+  margin-bottom: calc(var(--board-gap) * 0.5);
+  font-size: max(0.55rem, calc(var(--card-w) * 0.078));
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 900;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.slot-badge.treated { color: #07372f; background: var(--teal); }
+.slot-badge.untreated { color: #4b120b; background: var(--orange); }
+
+.drug-attachment {
+  position: absolute;
+  top: calc(var(--card-h) * 0.14);
+  left: 50%;
+  margin: 0;
+  z-index: 3;
+  transform: translateX(-50%);
+  transition: opacity 0.3s;
+  box-shadow: 0 -4px 10px #0004;
+  border-radius: 0.85rem;
+  animation: drop-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.slot:hover .drug-attachment { transform: translateX(-50%); }

@@ -5,7 +5,7 @@ import { HomeScreen } from '../components/HomeScreen'
 import { OnlineLobby } from '../components/OnlineLobby'
 import { SetupScreen } from '../components/SetupScreen'
 import { useGameStore } from '../store/gameStore'
-import '../styles.css'
+import '../styles/index.css'
 
 export function App() {
   const [mode, setMode] = useState<'home' | 'local' | 'online'>('home')

@@ -1,0 +1,109 @@
+/* ── Cards ── */
+.card-button {
+  display: block;
+  padding: 0;
+  background: none;
+  border: none;
+  text-align: left;
+  min-height: unset;
+  transition: transform 0.2s, box-shadow 0.2s, margin 0.2s, filter 0.2s;
+  border-radius: 0.85rem;
+}
+.card-button.dimmed-pending { opacity: 0.7; filter: grayscale(50%); pointer-events: none; }
+
+.card-frame {
+  flex: 0 0 12.5rem;
+  width: 12.5rem;
+  min-height: 16rem;
+  position: relative;
+  border-radius: 0.85rem;
+  padding: 0.25rem;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid rgba(148,163,184,.2);
+  box-shadow: 0 6px 12px rgba(0,0,0,.35);
+}
+.game-board .card-frame {
+  flex: 0 0 var(--card-w);
+  width: var(--card-w);
+  height: var(--card-h);
+  min-height: var(--card-h);
+  border-radius: var(--card-radius);
+}
+.game-board .game-card-content { height: 100%; padding: calc(var(--card-w) * 0.055); gap: calc(var(--card-w) * 0.04); }
+.game-board .card-title { font-size: var(--card-title-fs); }
+.game-board .card-summary { font-size: var(--card-summary-fs); line-height: 1.25; }
+/* Small cards get fewer lines so the text ends in an ellipsis rather than
+   being sliced by the frame's overflow. */
+.game-board { --card-summary-lines: 6; }
+.game-board .card-kicker, .game-board .card-label { font-size: var(--card-micro-fs); }
+.game-board .side-effect-chip { font-size: var(--card-micro-fs); }
+.game-board .card-symbol { width: calc(var(--card-w) * 0.17); height: calc(var(--card-w) * 0.17); font-size: var(--card-micro-fs); }
+.card-frame::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.45;
+  background: repeating-linear-gradient(45deg, transparent 0 7px, rgba(255,255,255,.04) 7px 8px);
+}
+
+/* Card type gradients */
+.card-frame-disorder { background: linear-gradient(135deg, #d96c5b, #7e3735); }
+.card-frame-drug     { background: linear-gradient(135deg, var(--teal), var(--teal-dark)); }
+.card-frame-episode  { background: linear-gradient(135deg, #df75d5, #63326f); }
+.card-frame-therapy  { background: linear-gradient(135deg, #f3c96d, #a87632); }
+
+.game-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 100%;
+  padding: 0.6rem;
+  border-radius: 0.65rem;
+  background: linear-gradient(155deg, var(--bg-from), rgba(2,6,23,.95));
+}
+.card-header { display: flex; justify-content: space-between; align-items: center; }
+.card-symbol {
+  display: grid;
+  place-items: center;
+  width: 1.5rem; height: 1.5rem;
+  border-radius: 50%;
+  background: rgba(255,255,255,.12);
+  color: var(--text-strong);
+}
+.card-kicker, .card-label {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-size: 0.66rem;
+  letter-spacing: 0.09em;
+  font-weight: 800;
+}
+.card-title {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.15;
+  margin-bottom: 0.2rem;
+  color: var(--text-strong);
+}
+.card-summary {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 400;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--card-summary-lines, 6);
+  overflow: hidden;
+}
+.card-label + .card-summary { color: #f1d5cd; }
+.side-effect-list { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.side-effect-chip {
+  padding: 0.16rem 0.35rem;
+  border: 1px solid rgba(168,85,247,.5);
+  border-radius: 0.45rem;
+  color: #efd9f8;
+  background: rgba(168,85,247,.12);
+  font-size: 0.67rem;
+  line-height: 1.2;
+}

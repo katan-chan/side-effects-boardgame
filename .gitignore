@@ -159,3 +159,4 @@ files/
 *.zip
 
 template.md
+.gstack/

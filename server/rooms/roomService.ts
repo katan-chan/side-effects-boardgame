@@ -10,6 +10,7 @@ import { createGame } from '../../src/game/engine/setup'
 import { playTherapy } from '../../src/game/engine/therapy'
 import { discardCard, discardManual, drawForTurn, endTurn, forfeitGame } from '../../src/game/engine/turns'
 import type { GameState } from '../../src/game/engine/types'
+import { describeCommand } from '../../src/game/log/describeCommand'
 import type { GameCommand } from '../game/commands'
 import type { Room, RoomPlayer } from './types'
 import type { PendingDecision } from './types'
@@ -164,9 +165,10 @@ export class RoomService {
     }
     const nextGame = this.applyCommand(game, playerId, command)
     room.gameState = nextGame
-    room.gameLog = [...room.gameLog, this.publicLogEntry(game, command)].slice(
-      -30,
-    )
+    room.gameLog = [
+      ...room.gameLog,
+      describeCommand(game, command, nextGame),
+    ].slice(-30)
     if (nextGame.status === 'finished') room.status = 'finished'
     this.persistRoom(room)
     return nextGame
@@ -205,16 +207,17 @@ export class RoomService {
           ? { chosenCardId: cardIds[0] }
           : { tremorsDiscardCardIds: cardIds },
     }
+    const before = room.gameState
     const nextGame = this.applyCommand(
-      room.gameState,
-      room.gameState.currentPlayerId,
+      before,
+      before.currentPlayerId,
       command,
     )
     room.pendingDecision = undefined
     room.gameState = nextGame
     room.gameLog = [
       ...room.gameLog,
-      this.publicLogEntry(room.gameState, decision.command),
+      describeCommand(before, decision.command, nextGame),
     ].slice(-30)
     if (nextGame.status === 'finished') room.status = 'finished'
     this.persistRoom(room)
@@ -328,24 +331,6 @@ export class RoomService {
     let code = generateCode()
     while (this.rooms.has(code)) code = generateCode()
     return code
-  }
-
-  private publicLogEntry(game: GameState, command: GameCommand): string {
-    const actor =
-      game.players.find((player) => player.id === game.currentPlayerId)?.name ??
-      'Một người chơi'
-    const labels: Record<GameCommand['type'], string> = {
-      draw: 'đã rút 2 lá',
-      playDrug: 'đã điều trị một Rối loạn',
-      playDisorder: 'đã gây một Rối loạn cho đối thủ',
-      playEpisode: 'đã kích hoạt một Cơn phát bệnh',
-      playTherapy: 'đã dùng Trị liệu',
-      discard: 'đã bỏ một lá bài',
-      endTurn: 'đã kết thúc lượt',
-      forfeit: 'đã xin thua',
-      discardManual: 'đã chủ động bỏ một lá bài',
-    }
-    return `${actor} ${labels[command.type]}.`
   }
 
   private createPendingDecision(
