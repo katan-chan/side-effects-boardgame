@@ -9,8 +9,10 @@ import { createGame } from '../game/engine/setup'
 import { playTherapy as playTherapyCommand } from '../game/engine/therapy'
 import {
   discardCard as discardCardCommand,
+  discardManual as discardManualCommand,
   drawForTurn,
   endTurn as endTurnCommand,
+  forfeitGame as forfeitGameCommand,
 } from '../game/engine/turns'
 import type { GameState } from '../game/engine/types'
 import { t } from '../i18n'
@@ -34,7 +36,9 @@ interface GameStore {
   ) => void
   playTherapy: (therapyCardId: string, disorderCardId: string) => void
   discard: (cardInstanceId: string) => void
+  manualDiscard: (cardInstanceId: string) => void
   endTurn: () => void
+  forfeit: () => void
   resetGame: () => void
   clearError: () => void
 }
@@ -155,11 +159,20 @@ export const useGameStore = create<GameStore>((set, get) => {
         (before) =>
           t('logDiscard', { player: before.players[before.currentPlayerIndex].name }),
       ),
+    manualDiscard: (cardInstanceId) =>
+      run(
+        (game) => discardManualCommand(game, game.currentPlayerId, cardInstanceId),
+        (before) => t('logDiscard', { player: before.players[before.currentPlayerIndex].name }),
+      ),
     endTurn: () =>
       run(
         (game) => endTurnCommand(game, game.currentPlayerId),
         (before) =>
           t('logEndTurn', { player: before.players[before.currentPlayerIndex].name }),
+      ),
+    forfeit: () =>
+      run(
+        (game) => forfeitGameCommand(game, game.currentPlayerId),
       ),
     resetGame: () =>
       set({ gameState: undefined, error: undefined, gameLog: [] }),

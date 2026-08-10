@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { CardInstance } from '../game/cards/types'
 import type { GameState, PlayerState } from '../game/engine/types'
 import type {
@@ -7,7 +7,8 @@ import type {
   PublicCardView,
   PublicPsycheSlotView,
 } from '../../server/game/playerView'
-import { localizeError, phaseName, t } from '../i18n'
+import { disorderName, localizeError, phaseName, t } from '../i18n'
+import { getCardDefinition } from '../game/cards/catalog'
 import { GameCard } from './cards/GameCard'
 import { CardBack } from './cards/CardBack'
 import { OpponentAvatarBar } from './OpponentAvatarBar'
@@ -42,7 +43,11 @@ interface GameBoardProps {
   gameLog: string[]
   onDraw: () => void
   onEndTurn: () => void
+  onForfeit: () => void
+  onLeave?: () => void
+  onClearError?: () => void
   onDiscard: (cardId: string) => void
+  onManualDiscard: (cardId: string) => void
   onPlayDrug: (drugId: string, disorderId: string) => void
   onPlayDisorder: (disorderId: string, targetPlayerId: string) => void
   onPlayEpisode: (
@@ -77,7 +82,11 @@ export function Psyche({
         
         let canSelect = false
         if (selectedCard) {
-          if (selectedCard.cardType === 'drug' || selectedCard.cardType === 'therapy') {
+          if (selectedCard.cardType === 'drug') {
+            const definition = getCardDefinition(selectedCard.definitionId)
+            canSelect = isOwn && isUntreated && definition?.cardType === 'drug' &&
+              slot.disorder.definitionId === definition.treats
+          } else if (selectedCard.cardType === 'therapy') {
             canSelect = isOwn && isUntreated
           } else if (selectedCard.cardType === 'episode') {
             canSelect = !isOwn && isUntreated
@@ -133,9 +142,10 @@ function CardButton({
     <button
       type="button"
       className={`card-button ${selected ? 'selected' : ''}`}
-      onClick={(event) => {
-        event.stopPropagation()
-        onClick()
+        onClick={(event) => {
+          event.stopPropagation()
+          onClick()
+          event.currentTarget.blur()
       }}
     >
       <GameCard card={card} />
@@ -158,10 +168,22 @@ export function GameBoard(props: GameBoardProps) {
   const [focusedOpponentId, setFocusedOpponentId] = useState<string>()
   const [showLog, setShowLog] = useState(false)
   const [isLocked, setIsLocked] = useState(false) // Lock interactions while waiting for server
+  const [sortMode, setSortMode] = useState<'original' | 'type' | 'name'>('original')
 
   useGameAudio(game as PlayerGameView, viewer.id)
 
   const selectedCard = viewerHand.find((card) => card.instanceId === selectedCardId)
+  const selectedTreatment = selectedCard?.cardType === 'drug'
+    ? getCardDefinition(selectedCard.definitionId)
+    : undefined
+  const sortedHand = useMemo(() => {
+    if (sortMode === 'original') return viewerHand
+    return [...viewerHand].sort((a, b) =>
+      sortMode === 'type'
+        ? a.cardType.localeCompare(b.cardType) || a.displayName.localeCompare(b.displayName)
+        : a.displayName.localeCompare(b.displayName),
+    )
+  }, [sortMode, viewerHand])
   const isTargetingMode = selectedCard !== undefined
 
   const opponents = game.players.filter((player) => player.id !== viewer.id)
@@ -184,12 +206,6 @@ export function GameBoard(props: GameBoardProps) {
     }
   }, [props.error])
 
-  useEffect(() => {
-    if (focusedOpponent && focusedOpponent.id !== focusedOpponentId) {
-      setFocusedOpponentId(focusedOpponent.id)
-    }
-  }, [focusedOpponent, focusedOpponentId])
-
   // Cancel targeting on escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -204,6 +220,8 @@ export function GameBoard(props: GameBoardProps) {
     setSelectedCardId(undefined)
     action()
   }
+
+  const isDiscardPhase = isViewerTurn && game.turn.phase === 'discard'
 
   const handleTargetSlot = (ownerId: string, slotId: string) => {
     if (!selectedCard || isLocked || !isViewerTurn) return
@@ -236,15 +254,8 @@ export function GameBoard(props: GameBoardProps) {
       return
     }
 
-    if (selectedCard.cardType === 'disorder') {
-      triggerGhost(`hand-card-${selectedCard.instanceId}`, `avatar-${opponentId}`, selectedCard, 'card', () => {
-        audioManager.play('disorder-play')
-      })
-      executeCommand(() => props.onPlayDisorder(selectedCard.instanceId, opponentId))
-    } else {
-      audioManager.play('click')
-      setFocusedOpponentId(opponentId)
-    }
+    audioManager.play('click')
+    setFocusedOpponentId(opponentId)
   }
 
   const handleBackgroundClick = () => {
@@ -256,6 +267,27 @@ export function GameBoard(props: GameBoardProps) {
       className={`game-board ${isTargetingMode ? 'targeting-mode' : ''} ${isLocked ? 'interaction-locked' : ''}`}
       onClick={handleBackgroundClick}
     >
+      <div className="top-actions" onClick={(event) => event.stopPropagation()}>
+        {props.onLeave && (
+          <button type="button" className="btn-danger top-action-btn" onClick={props.onLeave}>
+            Về phòng
+          </button>
+        )}
+        <button
+          type="button"
+          className="btn-danger top-action-btn"
+          disabled={!isViewerTurn || game.status !== 'playing' || isLocked}
+          onClick={() => {
+            if (window.confirm('Bạn chắc chắn muốn xin thua ván này?')) executeCommand(props.onForfeit)
+          }}
+        >
+          Xin thua
+        </button>
+        <button className="log-icon-btn top-action-icon" type="button" onClick={() => { audioManager.play('click'); setShowLog(!showLog) }} aria-label={t('gameLog')}>
+          📜
+        </button>
+        <AudioSettings />
+      </div>
       <section className="opponent-zone">
         {opponents.length > 1 && (
           <OpponentAvatarBar
@@ -280,6 +312,19 @@ export function GameBoard(props: GameBoardProps) {
               <header className="opponent-header" style={{ marginBottom: '1rem', color: '#9bf6e5', fontWeight: 'bold' }}>
                 {focusedOpponent.name} — {t('hand')}: {'handCount' in focusedOpponent ? focusedOpponent.handCount : focusedOpponent.hand?.length}
               </header>
+            )}
+            {selectedCard?.cardType === 'disorder' && isViewerTurn && focusedOpponent.id === focusedOpponentId && (
+              <button
+                type="button"
+                className="primary apply-card-btn"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  triggerGhost(`hand-card-${selectedCard.instanceId}`, `avatar-${focusedOpponent.id}`, selectedCard, 'card', () => audioManager.play('disorder-play'))
+                  executeCommand(() => props.onPlayDisorder(selectedCard.instanceId, focusedOpponent.id))
+                }}
+              >
+                Áp dụng vào Tâm trí của {focusedOpponent.name}
+              </button>
             )}
             <Psyche
               player={focusedOpponent}
@@ -312,7 +357,19 @@ export function GameBoard(props: GameBoardProps) {
 
 
       <section className="self-zone">
-        {props.error && <p className="error" style={{ marginBottom: '1rem' }}>{localizeError(props.error)}</p>}
+        {props.error && (
+          <div className="game-error-modal" role="alertdialog" aria-modal="true">
+            <div className="game-error-panel">
+              <h2>Không thể thực hiện</h2>
+              <p>{localizeError(props.error)}</p>
+              <button type="button" className="primary" onClick={props.onClearError}>Đã hiểu</button>
+            </div>
+          </div>
+        )}
+
+        {isDiscardPhase && (
+          <p className="turn-hint">Bạn đang có {viewerHand.length} lá. Hãy chọn và bỏ {viewerHand.length - 6} lá để tiếp tục.</p>
+        )}
         
         <div className="hud-glass">
           {isViewerTurn ? <strong>Lượt của bạn</strong> : <span>Lượt của {current.name}</span>}
@@ -362,8 +419,13 @@ export function GameBoard(props: GameBoardProps) {
             </button>
           )}
           <section className="hand own-hand" id="own-hand">
+            {selectedTreatment?.cardType === 'drug' && (
+              <div className="selection-hint">
+                Thuốc này chữa được: <strong>{disorderName(selectedTreatment.treats)}</strong>
+              </div>
+            )}
             <div className="cards">
-              {viewerHand.map((card) => (
+              {sortedHand.map((card) => (
                 <div id={`hand-card-${card.instanceId}`} key={card.instanceId}>
                   <CardButton
                     card={card}
@@ -380,7 +442,28 @@ export function GameBoard(props: GameBoardProps) {
           </section>
           
           <div className="controls-bar">
-            {isTargetingMode && game.turn.phase === 'discard' && (
+            <button
+              type="button"
+              className="utility-btn"
+              onClick={() => setSortMode(sortMode === 'original' ? 'type' : sortMode === 'type' ? 'name' : 'original')}
+              title="Sắp xếp bài trên tay"
+            >
+              {sortMode === 'original' ? 'Sắp xếp' : sortMode === 'type' ? 'Theo loại' : 'Theo tên'}
+            </button>
+            {isTargetingMode && isViewerTurn && game.turn.phase === 'play' && (
+              <button
+                type="button"
+                className="btn-danger action-btn"
+                disabled={isLocked}
+                onClick={() => {
+                  const currentId = selectedCardId
+                  if (currentId) executeCommand(() => props.onManualDiscard(currentId))
+                }}
+              >
+                Bỏ bài
+              </button>
+            )}
+            {isTargetingMode && isDiscardPhase && (
               <button type="button" className="primary action-btn" onClick={() => {
                 const currentId = selectedCardId
                 if (currentId) {
@@ -403,10 +486,6 @@ export function GameBoard(props: GameBoardProps) {
             >
               {t('endTurn')}
             </button>
-            <button className="log-icon-btn" type="button" onClick={(e) => { e.stopPropagation(); audioManager.play('click'); setShowLog(!showLog); }} aria-label={t('gameLog')}>
-              📜
-            </button>
-            <AudioSettings />
           </div>
         </div>
       </section>

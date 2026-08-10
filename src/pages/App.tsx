@@ -42,7 +42,10 @@ export function App() {
       gameLog={store.gameLog}
       onDraw={store.draw}
       onEndTurn={store.endTurn}
+      onForfeit={store.forfeit}
+      onClearError={store.clearError}
       onDiscard={store.discard}
+      onManualDiscard={store.manualDiscard}
       onPlayDrug={store.playDrug}
       onPlayDisorder={store.playDisorder}
       onPlayEpisode={store.playEpisode}

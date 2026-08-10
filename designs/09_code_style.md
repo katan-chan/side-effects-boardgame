@@ -11,135 +11,162 @@
 
 ---
 
-## 2. Comment
+## 2. Module system
 
-**Nguyên tắc: tối thiểu hóa.** Code tốt tự giải thích được. Comment chỉ xuất hiện khi thực sự cần.
+Toàn bộ project dùng **ES Modules** (`"type": "module"` trong `package.json`). Không dùng CommonJS (`require`).
 
-**Không cần:**
-- Summary đầu file
-- Docstring đầy đủ cho từng function
-- Comment giải thích code đơn giản
+```javascript
+// Đúng
+import { query } from "./db/client.js";
+export function canCure(drug, disorder) { ... }
+
+// Sai
+const { query } = require("./db/client");
+module.exports = { canCure };
+```
+
+Extension `.js` bắt buộc trong import path (Node ES Module yêu cầu).
+
+---
+
+## 3. Comment
+
+**Tối thiểu hóa.** Code tốt tự giải thích.
 
 **Nên có:**
-- Comment ngắn 1 dòng cho hàm dài và phức tạp — giải thích *tại sao*, không phải *cái gì*
-- Comment cho logic không hiển nhiên
-- `# TODO:` hoặc `# FIXME:` khi có điểm cần quay lại
+- Comment giải thích *tại sao*, không phải *cái gì*
+- Logic không hiển nhiên (đặc biệt boardgame.io quirks)
+- `// TODO:` hoặc `// FIXME:`
 
-**Ví dụ đúng:**
-```python
-# wait full window duration even if all players responded — early close leaks reaction timing
-await asyncio.sleep(remaining)
+```javascript
+// boardgame.io returns INVALID_MOVE (not throws) to signal validation failure
+if (!canCure(drug, disorder)) return INVALID_MOVE;
 
-def resolve_drug_action(game_state, player, drug_card, target_disorder):
-    # potency 3 = wildcard, matches any disorder type
-    if drug_card.potency == 3 or drug_card.drug_type == target_disorder.cure_drug_type:
-        ...
+// wait full window duration — early close leaks reaction timing info
+setTimeout(closeWindow, SIDE_EFFECT_WINDOW_SECONDS * 1000);
 ```
 
 ---
 
-## 3. Tách hàm
+## 4. Tách hàm
 
-**Nguyên tắc: 1 hàm làm 1 việc.**
+**1 hàm làm 1 việc.** Nếu hàm > ~30 dòng hoặc cần mô tả bằng "và" → tách.
 
-- Nếu cần mô tả hàm bằng "và", đó là dấu hiệu cần tách.
-- Hàm dài hơn ~30–40 dòng nên xem lại.
+```javascript
+// Đúng — server/src/game/resolver.js
+export function resolveDrug(G, player, drug, disorder) {
+  if (!canCure(drug, disorder)) return null;
+  removePsycheDisorder(player, disorder.slug);
+  removeHandCard(player, drug.slug);
+  G.discardPile.push(drug.slug);
+  return buildSideEffectWindow(player, drug);
+}
 
-**Ví dụ cấu trúc đúng (`resolver.py`):**
-
-```python
-def resolve_drug_action(game_state, player, drug_card, target_disorder):
-    if not can_cure(drug_card, target_disorder):
-        return ActionResult(success=False, reason="drug_mismatch")
-    apply_cure(player, target_disorder)
-    open_side_effect_window(game_state, player, drug_card)
-    return check_win_condition(game_state, player)
-
-def can_cure(drug_card, disorder): ...
-def apply_cure(player, disorder): ...
-def open_side_effect_window(game_state, player, drug_card): ...
-def check_win_condition(game_state, player): ...
+function canCure(drug, disorder) { ... }
+function removePsycheDisorder(player, slug) { ... }
+function removeHandCard(player, slug) { ... }
+function buildSideEffectWindow(player, drug) { ... }
 ```
 
 ---
 
-## 4. Đặt tên
+## 5. Đặt tên
 
 **Rõ ràng hơn ngắn gọn.**
 
-```python
-# Sai
-def chk(p, c): ...
-dis = get_d(slug)
+```javascript
+// Sai
+const p = G.players[Number(ctx.cp)];
+const d = findDisorder(slug);
 
-# Đúng
-def can_cure(drug_card, disorder): ...
-disorder = get_disorder_by_slug(slug)
+// Đúng
+const currentPlayer = G.players[Number(ctx.currentPlayer)];
+const disorder = findDisorderBySlug(slug);
 ```
 
 **Convention:**
-- Python: `snake_case` cho biến/hàm, `PascalCase` cho class.
-- JavaScript/React: `camelCase` cho biến/hàm, `PascalCase` cho component.
-- Hằng số: `UPPER_SNAKE_CASE` ở cả hai.
-- File Python: `snake_case.py`. File React component: `PascalCase.jsx`. File hook/util: `camelCase.js`.
+- `camelCase` cho biến và hàm.
+- `PascalCase` cho class và React component.
+- `UPPER_SNAKE_CASE` cho hằng số.
+- File server: `camelCase.js`. File React component: `PascalCase.jsx`. File hook: `useCamelCase.js`.
 
 ---
 
-## 5. Cấu trúc file
+## 6. boardgame.io specifics
 
-- Không có summary/description ở đầu file.
-- Import sắp xếp theo nhóm: stdlib → third-party → local. Mỗi nhóm cách nhau 1 dòng trống.
-- Nếu file bắt đầu dài (> ~200 dòng), xem xét tách module.
+**Moves phải pure function** (không side effects ngoài modify `G`):
+```javascript
+// Đúng — chỉ modify G
+export function playDrug(G, ctx, { cardSlug, targetDisorderSlug }) {
+  G.players[Number(ctx.currentPlayer)].hand = ...;
+}
+
+// Sai — không gọi external service trong move
+export function playDrug(G, ctx, args) {
+  await logToDatabase(...); // ❌ move không được async
+}
+```
+
+**Logging trong moves:** Dùng `G.lastAction` để FE biết cần hiển thị gì. Server logging thực hiện trong `onEnd`/`onBegin` hook hoặc `StorageAPI`, không trong move.
+
+**INVALID_MOVE:** Import từ `boardgame.io/core`, return (không throw) khi move không hợp lệ:
+```javascript
+import { INVALID_MOVE } from "boardgame.io/core";
+
+export function playDrug(G, ctx, args) {
+  if (!isValid(args)) return INVALID_MOVE;
+  ...
+}
+```
 
 ---
 
-## 6. Quy tắc cụ thể
+## 7. React specifics
 
-**Python:**
-- Dùng type hint cho function signature của các hàm public.
-- Dùng `dataclass` cho data container, không dùng dict thuần khi có schema cố định.
-- Không catch exception quá rộng (`except Exception`) trừ ở top-level error handler.
-
-**React/JavaScript:**
 - Mỗi component trong file riêng.
 - Business logic vào hook hoặc store — không trong component.
-- Không truyền quá 3–4 props xuống nhiều tầng — dùng Zustand store.
-
-**Chung:**
-- Không commit code có `console.log` debug còn sót.
-- Magic number → đặt thành hằng:
-  ```python
-  # Sai
-  await asyncio.sleep(10)
-  
-  # Đúng
-  SIDE_EFFECT_WINDOW_SECONDS = 10
-  await asyncio.sleep(SIDE_EFFECT_WINDOW_SECONDS)
-  ```
+- Game state đọc từ `G`/`ctx` props (boardgame.io) — không duplicate vào Zustand.
+- Zustand chỉ cho UI state: guest session, lobby, chat messages, timer display preference.
 
 ---
 
-## 7. Các hằng số quan trọng (centralize trong `config/settings.py`)
+## 8. Hằng số tập trung (`server/src/game/constants.js`)
 
-```python
-# Gameplay
-INITIAL_DISORDERS = 4
-INITIAL_HAND_SIZE = 4
-DEFAULT_MAX_HAND_SIZE = 7
-DEFAULT_TURN_TIMEOUT_SECONDS = 60
-SIDE_EFFECT_WINDOW_SECONDS = 10
-DISCARD_TIMEOUT_SECONDS = 10
-CHOOSE_DISORDER_TIMEOUT_SECONDS = 10
+```javascript
+// Gameplay
+export const INITIAL_DISORDERS = 4;
+export const INITIAL_HAND_SIZE = 4;
+export const DEFAULT_MAX_HAND_SIZE = 7;
+export const DEFAULT_TURN_TIMEOUT_SECONDS = 60;
+export const SIDE_EFFECT_WINDOW_SECONDS = 10;
+export const DISCARD_TIMEOUT_SECONDS = 10;
+export const CHOOSE_DISORDER_TIMEOUT_SECONDS = 10;
 
-# Connection
-AFK_TIMEOUT_SECONDS = 30
-GAME_PAUSE_TIMEOUT_SECONDS = 300   # 5 phút
-GUEST_SESSION_EXPIRY_DAYS = 14
+// Connection
+export const AFK_TIMEOUT_SECONDS = 30;
+export const GUEST_SESSION_EXPIRY_DAYS = 14;
 
-# Server
-MAX_PLAYERS_PER_ROOM = 8
-MAX_ROOMS = 10                     # bỏ qua khi DEV_MODE=true
-SNAPSHOT_RETENTION = 5
-LOAD_CHECK_RAM_THRESHOLD = 80      # %
-LOAD_CHECK_CPU_THRESHOLD = 85      # %
+// Server
+export const MAX_PLAYERS_PER_ROOM = 8;
+export const MAX_ROOMS = 10;              // bỏ qua khi DEV_MODE=true
+export const LOAD_CHECK_RAM_THRESHOLD = 80; // %
+
+// boardgame.io
+export const GAME_NAME = "PsycheWard";
 ```
+
+Mirror một phần sang client: `client/src/config/constants.js` cho các giá trị FE cần (timeouts, max hand size...).
+
+---
+
+## 9. Không commit
+
+```gitignore
+# .gitignore
+node_modules/
+.env
+*.log
+dist/
+```
+
+Không commit `console.log` debug còn sót. Dùng `logger.debug()` từ `utils/logger.js` — tự tắt trong production.

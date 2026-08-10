@@ -1,12 +1,12 @@
-# 04 - Session & Storage — PsycheWard
+# 04 - Session & Lobby Server — PsycheWard
 
 ## 1. Tổng quan
 
-PsycheWard không có hệ thống đăng nhập. Định danh người chơi dựa trên **guest session** lưu trong `localStorage` của trình duyệt. Không có tài khoản, không có password, không có cookie auth.
+PsycheWard không có đăng nhập. Định danh người chơi dựa trên **guest session** lưu trong `localStorage`. Lobby (tạo/vào phòng) dùng Express routes mount lên cùng server với boardgame.io.
 
 ---
 
-## 2. Guest Session
+## 2. Guest Session (Frontend)
 
 ### Cấu trúc localStorage
 
@@ -18,113 +18,223 @@ PsycheWard không có hệ thống đăng nhập. Định danh người chơi d�
 }
 ```
 
-| Field | Mô tả |
-|---|---|
-| `guest_id` | UUID v4, tạo một lần, dùng mãi cho đến khi hết hạn |
-| `display_name` | Tên hiển thị trong game — người dùng có thể đổi bất kỳ lúc nào (ngoài ván) |
-| `last_seen` | ISO 8601 timestamp, cập nhật mỗi lần truy cập |
-
-### Rolling expiry: 14 ngày
-
-`useGuestSession.js` chạy khi app load:
+### Rolling expiry — 14 ngày
 
 ```javascript
+// client/src/hooks/useGuestSession.js
 const EXPIRY_DAYS = 14;
+const STORAGE_KEY = "psycheward_guest";
 
-function loadOrCreateGuestSession() {
-    const raw = localStorage.getItem('psycheward_guest');
+export function useGuestSession() {
+  const [session, setSession] = useState(() => loadOrCreate());
+
+  function loadOrCreate() {
+    const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-        const session = JSON.parse(raw);
-        const lastSeen = new Date(session.last_seen);
-        const daysSince = (Date.now() - lastSeen) / (1000 * 60 * 60 * 24);
-        if (daysSince < EXPIRY_DAYS) {
-            // còn hạn → refresh last_seen và dùng tiếp
-            session.last_seen = new Date().toISOString();
-            localStorage.setItem('psycheward_guest', JSON.stringify(session));
-            return session;
-        }
+      const s = JSON.parse(raw);
+      const daysSince = (Date.now() - new Date(s.last_seen)) / 86_400_000;
+      if (daysSince < EXPIRY_DAYS) {
+        s.last_seen = new Date().toISOString();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+        return s;
+      }
     }
-    // hết hạn hoặc chưa có → tạo mới
-    return createNewGuestSession();
-}
+    return createNew();
+  }
 
-function createNewGuestSession() {
-    const session = {
-        guest_id: crypto.randomUUID(),
-        display_name: generateRandomName(),   // xem §2.1
-        last_seen: new Date().toISOString(),
+  function createNew() {
+    const s = {
+      guest_id: crypto.randomUUID(),
+      display_name: generateRandomName(),
+      last_seen: new Date().toISOString(),
     };
-    localStorage.setItem('psycheward_guest', JSON.stringify(session));
-    return session;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+    return s;
+  }
+
+  function rename(newName) {
+    const s = { ...session, display_name: newName };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+    setSession(s);
+  }
+
+  return { session, rename };
 }
 ```
 
-### 2.1 Tên tự động (Name Pool)
+### Name pool tự động
 
 ```javascript
 const ADJECTIVES = [
-    'Crazy', 'Anxious', 'Paranoid', 'Drowsy', 'Manic',
-    'Bipolar', 'Jittery', 'Zoned', 'Glitchy', 'Foggy',
-    'Restless', 'Scattered', 'Numb', 'Frantic', 'Dazed',
+  "Crazy", "Anxious", "Paranoid", "Drowsy", "Manic",
+  "Bipolar", "Jittery", "Zoned", "Glitchy", "Foggy",
+  "Restless", "Scattered", "Numb", "Frantic", "Dazed",
 ];
-
 const NOUNS = [
-    'Nurse', 'Doctor', 'Patient', 'Intern', 'Orderly',
-    'Shrink', 'Pharmacist', 'Therapist', 'Resident', 'Medic',
+  "Nurse", "Doctor", "Patient", "Intern", "Orderly",
+  "Shrink", "Pharmacist", "Therapist", "Resident", "Medic",
 ];
 
 function generateRandomName() {
-    const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
-    const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
-    const id = Math.floor(1000 + Math.random() * 9000); // 4 số
-    return `${adj}${noun}#${id}`;
+  const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+  const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
+  const id = Math.floor(1000 + Math.random() * 9000);
+  return `${adj}${noun}#${id}`;
 }
-// VD: "CrazyNurse#4821", "ParanoidShrink#7302"
 ```
-
-### 2.2 Đổi tên
-
-- Người chơi có thể đổi tên bất kỳ lúc nào **ngoài ván đang chơi**.
-- Khi đang trong phòng chờ: đổi tên → gửi event `RENAME` → server broadcast `ROOM_UPDATE` với tên mới.
-- Không được đổi tên trong ván (để tránh nhầm lẫn).
-- Ràng buộc tên: 2–20 ký tự, không thuần số, không có ký tự đặc biệt ngoài `#_-`.
 
 ---
 
-## 3. WebSocket Authentication
+## 3. Lobby API (Express, mount trên boardgame.io server)
 
-Không có JWT. Thay vào đó, `guest_id` gửi qua WebSocket query param khi kết nối:
+boardgame.io có sẵn `LobbyClient` nhưng yêu cầu credential — mình tự viết lobby nhẹ để hỗ trợ guest.
 
-```
-ws://host/ws/{room_code}?guest_id={uuid}&display_name={name}
-```
+### Endpoints
 
-Backend validate:
-- `guest_id` phải là UUID v4 hợp lệ.
-- `display_name` phải tuân thủ ràng buộc tên.
-- `room_code` phải là phòng đang chờ hoặc đang chơi.
-
-Không cần verify `guest_id` với database — chỉ dùng để định danh trong phòng. Nếu ai reconnect với cùng `guest_id` → coi là cùng 1 người.
-
----
-
-## 4. Session trên Backend
-
-Backend không lưu session vào D1. Toàn bộ mapping `guest_id → player` chỉ sống trong RAM (trong `GameState` và `room_manager`). Khi server restart, session mất — nhưng snapshot chứa `guest_id` nên khi Host resume, người chơi reconnect với cùng `guest_id` sẽ được map lại đúng slot.
-
----
-
-## 5. Thay đổi endpoint so với bản Ma Sói
-
-| Ma Sói | PsycheWard | Ghi chú |
+| Method | Path | Mô tả |
 |---|---|---|
-| `POST /auth/register` | `POST /session/init` | Tạo/validate guest session |
-| `POST /auth/login` | *(không có)* | Không cần đăng nhập |
-| `POST /auth/logout` | *(không có)* | Không cần đăng xuất |
-| `GET /me` | `GET /session/me` | Trả về display_name, guest_id |
-| — | `PATCH /session/rename` | Đổi tên |
+| `GET` | `/health` | Health check cho keep-alive ping |
+| `POST` | `/lobby/create` | Tạo phòng mới, trả về `matchID` |
+| `GET` | `/lobby/matches` | Danh sách phòng đang chờ |
+| `POST` | `/lobby/join` | Join phòng, trả về `playerID` và `credentials` |
+| `POST` | `/lobby/leave` | Rời phòng |
+| `PATCH` | `/lobby/rename` | Đổi tên trong phòng |
 
-`POST /session/init` nhận `{ guest_id?, display_name? }`:
-- Nếu `guest_id` đã tồn tại và hợp lệ → trả về confirm.
-- Nếu không có → backend không cần làm gì, chỉ FE tự generate.
-- Endpoint này optional — FE có thể hoàn toàn tự quản lý localStorage mà không cần gọi backend.
+### Tạo phòng — `POST /lobby/create`
+
+```javascript
+// server/src/lobby/router.js
+router.post("/create", async (req, res) => {
+  const { display_name, settings } = req.body;
+  if (!isValidName(display_name)) return res.status(400).json({ error: "invalid_name" });
+
+  // boardgame.io server API — tạo match mới
+  const matchID = await server.db.createMatch("PsycheWard", {
+    numPlayers: settings?.numPlayers ?? 4,
+    setupData: { settings, playerNames: [] },
+    unlisted: false,
+  });
+
+  res.json({ matchID });
+});
+```
+
+### Join phòng — `POST /lobby/join`
+
+```javascript
+router.post("/join", async (req, res) => {
+  const { matchID, guest_id, display_name, seat } = req.body;
+  if (!isValidName(display_name)) return res.status(400).json({ error: "invalid_name" });
+
+  // Dùng boardgame.io internal API để join match
+  // playerID = seat index (0-based string)
+  // credentials = guest_id (dùng để authenticate WebSocket sau)
+  const { playerCredentials } = await joinMatch(matchID, seat, {
+    playerName: display_name,
+    playerCredentials: guest_id,
+  });
+
+  res.json({ playerID: String(seat), credentials: playerCredentials });
+});
+```
+
+---
+
+## 4. Kết nối boardgame.io từ Client
+
+Sau khi join lobby, client khởi tạo boardgame.io connection:
+
+```jsx
+// client/src/pages/GamePage.jsx
+import { Client } from "boardgame.io/react";
+import { SocketIO } from "boardgame.io/multiplayer";
+import { PsycheWardGame } from "../config/gameDefinition.js"; // mirror của game trên server
+import { Board } from "../components/game/Board.jsx";
+
+const PsycheWardClient = Client({
+  game: PsycheWardGame,
+  board: Board,
+  multiplayer: SocketIO({ server: import.meta.env.VITE_SERVER_URL }),
+  debug: import.meta.env.DEV,  // bật debug panel khi dev
+});
+
+export function GamePage() {
+  const { matchID, playerID, credentials } = useRouteParams(); // từ URL / state
+  return (
+    <PsycheWardClient
+      matchID={matchID}
+      playerID={playerID}
+      credentials={credentials}
+    />
+  );
+}
+```
+
+boardgame.io tự lo:
+- WebSocket connection + reconnect
+- State sync: `G` và `ctx` tự cập nhật trong `Board` props
+- Secret state: `playerView` filter hand trước khi gửi về client
+
+---
+
+## 5. Board component nhận gì từ boardgame.io
+
+```jsx
+// client/src/components/game/Board.jsx
+export function Board({ G, ctx, moves, playerID, matchData, isActive }) {
+  // G        — game state (đã filter bởi playerView)
+  // ctx      — turn, phase, currentPlayer, gameover
+  // moves    — object các moves: moves.playDrug(), moves.passTurn(), ...
+  // playerID — ID của người chơi hiện tại trên thiết bị này
+  // isActive — true nếu đang đến lượt mình (hoặc đang trong activePlayers)
+  // matchData— display names của các player
+  // ...
+}
+```
+
+FE **không tự modify state** — chỉ gọi `moves.xxx()` và nhận `G` mới từ server.
+
+---
+
+## 6. Chat (Socket.io custom, song song với boardgame.io)
+
+boardgame.io không có chat built-in. Chat dùng Socket.io namespace `/chat` riêng, mount lên cùng server:
+
+```javascript
+// server/src/index.js
+const io = new Server(server.httpServer);
+const chat = io.of("/chat");
+
+chat.on("connection", (socket) => {
+  socket.on("join", ({ matchID }) => socket.join(matchID));
+  socket.on("message", ({ matchID, displayName, text }) => {
+    if (!text?.trim()) return;
+    chat.to(matchID).emit("message", {
+      displayName,
+      text: text.trim().slice(0, 300), // max 300 ký tự
+      timestamp: new Date().toISOString(),
+    });
+  });
+});
+```
+
+```javascript
+// client — useChat hook
+import { io } from "socket.io-client";
+const chatSocket = io(`${SERVER_URL}/chat`);
+```
+
+---
+
+## 7. Thay đổi so với bản Python
+
+| Bản Python/FastAPI | Bản Node/boardgame.io |
+|---|---|
+| Tự viết WebSocket với FastAPI | boardgame.io + Socket.io tự lo |
+| Tự viết turn management | `ctx.currentPlayer`, `ctx.turn` tự quản lý |
+| Tự viết game state sync | `G` tự sync sau mỗi move |
+| Tự viết reconnect logic | boardgame.io tự xử lý |
+| Tự viết secret state filter | `playerView` callback |
+| Snapshot thủ công vào D1 | `StorageAPI` tự gọi sau mỗi move |
+| Cloudflare D1 | PostgreSQL (cùng Render) |
+| Không cần JWT (guest_id thuần) | Giữ nguyên — `credentials = guest_id` |

@@ -4,25 +4,21 @@
 
 | Thành phần | Host | Gói |
 |---|---|---|
-| Backend (FastAPI) | Render | Free (512MB RAM, 0.1 vCPU) |
+| Game Server (boardgame.io + Express) | Render | Free (512MB RAM, 0.1 vCPU) |
 | Frontend (React build) | Cloudflare Pages | Free |
-| Database (D1) | Cloudflare | Free |
+| Database (PostgreSQL) | Render | Free (1GB, 90 ngày expire nếu không active) |
 | Keep-alive Worker | Cloudflare Workers | Free |
 
 **Giới hạn thực tế với Render free:**
-- Spin down sau 15 phút không có HTTP request → giải quyết bằng CF Worker ping (§2).
-- Restart bất ngờ mất RAM state → giải quyết bằng game snapshot vào D1 (xem `03_game_engine.md` §8).
-- Phù hợp cho 1–2 phòng, tối đa ~16 người cùng lúc. CPU 0.1 vCPU đủ cho use case này.
+- Spin down sau 15 phút không có HTTP request → giải quyết bằng CF Worker ping.
+- Render free PostgreSQL expire sau 90 ngày không active → cần ping DB hoặc upgrade.
+- Phù hợp cho 1–2 phòng, ~16 người cùng lúc.
+
+> **Render free PostgreSQL lưu ý:** Sau 90 ngày không có query → DB bị suspend. Giải pháp: thêm cron job ping `SELECT 1` hàng tuần, hoặc dùng Supabase free tier (không expire, 500MB).
 
 ---
 
 ## 2. Cloudflare Worker — Keep-alive ping
-
-### Vấn đề
-Render free spin down sau 15 phút không có HTTP request. WebSocket connection đang mở **không tính** là activity — giữa ván chơi server vẫn có thể ngủ và WebSocket đứt.
-
-### Giải pháp
-CF Worker Cron chạy mỗi **10 phút**, gọi `GET /health` trên Render.
 
 ```javascript
 // keep_alive/worker.js
@@ -47,56 +43,34 @@ crons = ["*/10 * * * *"]
 BACKEND_URL = "https://your-app.onrender.com"
 ```
 
-`/health` endpoint trên BE:
-```python
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
-```
-
-CF Worker free: 100,000 request/ngày. Ping 10 phút/lần = ~144/ngày — trong giới hạn.
-
 ---
 
 ## 3. Load check
 
-```python
-import psutil
+```javascript
+// server/src/lobby/router.js
+import os from "os";
 
-def can_accept_connection() -> bool:
-    ram_ok = psutil.virtual_memory().percent < 80
-    cpu_ok = psutil.cpu_percent(interval=0.1) < 85
-    return ram_ok and cpu_ok
+function canAcceptConnection() {
+  if (process.env.DEV_MODE === "true") {
+    console.debug("[DEV MODE] load check skipped");
+    return true;
+  }
+  const freeMemMB = os.freemem() / 1_000_000;
+  const totalMemMB = os.totalmem() / 1_000_000;
+  const memUsedPercent = ((totalMemMB - freeMemMB) / totalMemMB) * 100;
+  return memUsedPercent < 80;
+}
 ```
 
-**Dev mode:** Khi `DEV_MODE=true` trong `.env`, **bỏ qua hoàn toàn** load check — không có giới hạn phòng, không có giới hạn người chơi. Log rõ `[DEV MODE] load check skipped` để không nhầm lẫn khi review log production.
+> **Ghi chú:** Node.js không có `psutil` như Python. Dùng `os.freemem()` / `os.totalmem()` thay thế. CPU check phức tạp hơn (cần sample) — ở đây chỉ check RAM là đủ cho use case này.
 
-```python
-def can_accept_connection() -> bool:
-    if settings.DEV_MODE:
-        logger.debug("[DEV MODE] load check skipped")
-        return True
-    ram_ok = psutil.virtual_memory().percent < 80
-    cpu_ok = psutil.cpu_percent(interval=0.1) < 85
-    return ram_ok and cpu_ok
-```
+Khi `canAcceptConnection()` trả `false`:
+> *"Bệnh viện đang quá tải rồi 🏥 Vui lòng thử lại sau vài phút!"*
 
 ---
 
-## 4. Thông báo quá tải
-
-Khi `can_accept_connection()` trả `False`:
-
-> *"Bệnh viện đang quá tải rồi 🏥 Server tội nghiệp của chúng tôi đang chăm sóc quá nhiều bệnh nhân cùng lúc. Vui lòng thử lại sau vài phút!"*
-
-Variant ngắn (toast):
-> *"Server đang bận trị bệnh cho người khác 😵 Thử lại sau nhé!"*
-
-FE hiển thị dưới dạng toast — không redirect, không crash.
-
----
-
-## 5. Môi trường phát triển
+## 4. Môi trường phát triển
 
 ### Windows (môi trường chính)
 
@@ -105,81 +79,158 @@ FE hiển thị dưới dạng toast — không redirect, không crash.
 git clone https://github.com/your-org/psycheward.git
 cd psycheward
 
-# Backend setup
-cd backend
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-copy .env.example .env
-# Chỉnh .env: D1_ACCOUNT_ID, D1_DATABASE_ID, D1_API_TOKEN, DEV_MODE=true
-
-# Chạy backend
-uvicorn main:app --reload --port 8000
-
-# Frontend setup (terminal khác)
-cd frontend
+# Server setup
+cd server
 npm install
+copy .env.example .env
+# Chỉnh .env:
+#   DATABASE_URL=postgresql://localhost:5432/psycheward
+#   CLIENT_URL=http://localhost:5173
+#   DEV_MODE=true
+#   PORT=8000
+
+# Khởi tạo DB schema (PostgreSQL phải đang chạy)
+npm run db:init
+
+# Chạy server (với hot reload)
+npm run dev
+# → http://localhost:8000 (boardgame.io server)
+# → http://localhost:8000/lobby (lobby API)
+
+# Client setup (terminal khác)
+cd ../client
+npm install
+copy .env.example .env
+# Chỉnh .env:
+#   VITE_SERVER_URL=http://localhost:8000
+
 npm run dev
 # → http://localhost:5173
 ```
 
-> **Lưu ý PowerShell:** Nếu gặp lỗi "execution policy" khi chạy `Activate.ps1`:
+**PostgreSQL local trên Windows:**
+- Cài [PostgreSQL installer](https://www.postgresql.org/download/windows/) hoặc dùng Docker:
+  ```powershell
+  docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=psycheward postgres:16
+  ```
+
+> **PowerShell execution policy:** Nếu gặp lỗi khi chạy scripts:
 > ```powershell
 > Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 > ```
 
-### macOS/Linux (tham khảo)
+### macOS (tham khảo)
 
 ```bash
-# Backend
-cd backend
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
+cd server && npm install && cp .env.example .env
+# PostgreSQL: brew install postgresql@16 && brew services start postgresql@16
+# createdb psycheward
+npm run db:init && npm run dev
 
-uvicorn main:app --reload --port 8000
-
-# Frontend
-cd frontend
-npm install
-npm run dev
+cd ../client && npm install && cp .env.example .env && npm run dev
 ```
 
-> **macOS note:** Nếu dùng Homebrew Python, đảm bảo `python3` là 3.10+: `python3 --version`.
-> **Linux note:** Trên Ubuntu/Debian cần `python3-venv`: `sudo apt install python3-venv`.
+### Linux (tham khảo)
+
+```bash
+cd server && npm install && cp .env.example .env
+# PostgreSQL: sudo apt install postgresql && sudo service postgresql start
+# sudo -u postgres createdb psycheward
+npm run db:init && npm run dev
+
+cd ../client && npm install && cp .env.example .env && npm run dev
+```
 
 ---
 
-## 6. Logging
+## 5. Scripts (`server/package.json`)
 
-Mọi event quan trọng ghi ra stdout và file `backend/logs/YYYY-MM-DD.log`.
-
-### Format
-
-```
-[HH:MM:SS] [LEVEL] [context] message
-```
-
-Ví dụ:
-```
-[14:32:11] [INFO ] [room:ABC123] Game started — 4 players, Standard mode
-[14:32:45] [INFO ] [ABC123/CrazyNurse] PLAY_DRUG card=prozac target=anxiety
-[14:32:45] [INFO ] [ABC123] DISORDER_CURED seat=0 disorder=anxiety remaining=3
-[14:32:45] [INFO ] [ABC123] SIDE_EFFECT_WINDOW_OPEN duration=10s types=[insomnia,mania]
-[14:32:52] [INFO ] [ABC123/ParanoidShrink] SIDE_EFFECT_REACT disorder=insomnia target=CrazyNurse
-[14:33:01] [INFO ] [ABC123] TURN_END seat=0 → seat=1
-[14:35:22] [INFO ] [ABC123] GAME_END winner=CrazyNurse turns=47
-[14:35:22] [WARN ] [ABC123] Room cleanup scheduled
+```json
+{
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "db:init": "node src/db/init.js",
+    "db:reset": "node src/db/reset.js"
+  }
+}
 ```
 
-### Level
+> `node --watch` (Node 18+) thay cho `nodemon` — không cần install thêm package.
 
-| Level | Dùng cho |
-|---|---|
-| `DEBUG` | Raw WebSocket payload, D1 query params |
-| `INFO` | Turn boundaries, card actions, game events |
-| `WARN` | Server overload từ chối, AFK timeout, game cancelled |
-| `ERROR` | D1 connection fail, snapshot decrypt fail, invalid event |
+---
 
-Console: `INFO` trở lên. File log: tất cả kể cả `DEBUG`.
+## 6. Environment variables
+
+### Server (`.env`)
+
+```env
+# Database
+DATABASE_URL=postgresql://user:pass@host:5432/psycheward
+
+# Server
+PORT=8000
+CLIENT_URL=http://localhost:5173    # hoặc https://psycheward.pages.dev
+
+# Dev
+DEV_MODE=false                      # true → bỏ load check, bật debug logs
+NODE_ENV=development                # production trên Render
+
+# Encryption (cho snapshot nếu cần)
+ENCRYPTION_KEY=your-32-char-secret-here
+```
+
+### Client (`.env`)
+
+```env
+VITE_SERVER_URL=http://localhost:8000
+# Production: VITE_SERVER_URL=https://your-app.onrender.com
+```
+
+---
+
+## 7. Deploy lên Render
+
+```
+# Server (Web Service)
+Build command:  cd server && npm install
+Start command:  cd server && node src/index.js
+Environment:    NODE_ENV=production, DATABASE_URL=..., CLIENT_URL=...
+
+# PostgreSQL (Database)
+→ Tạo riêng trên Render → copy DATABASE_URL vào server env
+```
+
+```
+# Client (Cloudflare Pages)
+Build command:  cd client && npm install && npm run build
+Output dir:     client/dist
+Environment:    VITE_SERVER_URL=https://your-app.onrender.com
+```
+
+---
+
+## 8. Logging
+
+```javascript
+// server/src/utils/logger.js
+const LOG_LEVEL = process.env.DEV_MODE === "true" ? "debug" : "info";
+
+export const logger = {
+  debug: (...args) => LOG_LEVEL === "debug" && console.debug("[DEBUG]", ...args),
+  info:  (...args) => console.info("[INFO ]", ...args),
+  warn:  (...args) => console.warn("[WARN ]", ...args),
+  error: (...args) => console.error("[ERROR]", ...args),
+};
+```
+
+Render free tier không hỗ trợ file logging → log ra stdout, Render capture và hiển thị trong dashboard.
+
+Ví dụ log:
+```
+[INFO ] [ABC123] Game started — 4 players, Standard mode
+[INFO ] [ABC123/CrazyNurse] MOVE playDrug card=prozac target=anxiety
+[INFO ] [ABC123] Disorder cured seat=0 remaining=3
+[WARN ] [ABC123] Player DrowsyMedic AFK — auto-pass
+[INFO ] [ABC123] GAME_END winner=CrazyNurse turns=47
+```

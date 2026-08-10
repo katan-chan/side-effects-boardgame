@@ -4,23 +4,20 @@
 
 **PsycheWard** là web game thẻ bài nhiều người chơi theo lượt, lấy cảm hứng từ Side Effects (Pillbox Games). Mỗi người dùng thiết bị riêng (điện thoại hoặc máy tính), **không cần tài khoản** — chỉ cần điền tên và nhập mã phòng là chơi được.
 
-**Cơ chế nhận dạng người chơi (thay cho đăng nhập):**
-- Khi truy cập lần đầu, hệ thống tạo một **cache định danh** lưu trong `localStorage` của trình duyệt.
-- Người chơi chọn tên hiển thị: tự điền hoặc dùng tên tự động từ pool (`[Tính từ][Danh từ Y tế]` + ID 4–6 số, VD: `CrazyNurse#4821`).
-- Cache tồn tại tối đa **14 ngày** kể từ lần truy cập gần nhất (rolling expiry). Hết hạn → tên và session reset, nhưng không ảnh hưởng ván đang chơi.
-- Cache chỉ lưu: `guest_id` (UUID v4), `display_name`, `last_seen`. Không lưu thông tin cá nhân.
+**Cơ chế nhận dạng người chơi:**
+- Khi truy cập lần đầu, hệ thống tạo **guest session** lưu trong `localStorage`.
+- Người chơi chọn tên hiển thị: tự điền hoặc dùng tên tự động từ pool (`[Tính từ][Danh từ Y tế]` + ID 4 số, VD: `CrazyNurse#4821`).
+- Session tồn tại tối đa **14 ngày** kể từ lần truy cập gần nhất (rolling expiry).
 
-**Người tạo phòng (Host)** cũng là người chơi — họ cấu hình ván, điều chỉnh tùy chọn ngay tại màn hình chờ, rồi khởi động. Không có admin đứng ngoài điều phối.
+**Core loop:** Mỗi người bắt đầu với 4 thẻ Bệnh (Disorder cards) — lần lượt rút thẻ, dùng thẻ Thuốc để trị bệnh, nhưng thuốc có tác dụng phụ khiến người khác có thể ném bệnh mới vào bạn. Dùng thẻ Episode để cản trở đối thủ hoặc hỗ trợ bản thân. Ai trị hết bệnh trong "psyche" của mình trước thì thắng.
 
-**Core loop:** Mỗi người bắt đầu với 4 thẻ Bệnh (Disorder cards) — lần lượt rút thẻ, dùng thẻ Thuốc để trị bệnh, nhưng thuốc có tác dụng phụ khiến người khác có thể ném bệnh mới vào bạn. Dùng thẻ Episode để cản trở đối thủ hoặc hỗ trợ bản thân. Ai trị hết bệnh trong "tâm lý" (psyche) của mình trước thì thắng.
-
-Tài liệu chi tiết theo từng mảng:
-- `01_cards.md` — danh sách đầy đủ các loại thẻ (Disorder, Drug, Therapy, Episode)
+Tài liệu chi tiết:
+- `01_cards.md` — danh sách đầy đủ các loại thẻ
 - `02_game_modes.md` — chế độ chơi và tùy chọn cấu hình
-- `03_game_engine.md` — luật chơi, lượt đi, tương tác thẻ, thắng/thua
-- `04_session_storage.md` — session cache, database, WebSocket events
-- `05_database.md` — schema database
-- `06_websocket.md` — WebSocket event types
+- `03_game_engine.md` — boardgame.io Game object, moves, phases
+- `04_session_storage.md` — guest session, lobby server
+- `05_database.md` — schema database (PostgreSQL)
+- `06_client_server.md` — boardgame.io client/server events
 - `07_ui.md` — giao diện người dùng
 - `08_infrastructure.md` — hạ tầng và triển khai
 - `09_code_style.md` — quy tắc code
@@ -29,22 +26,33 @@ Tài liệu chi tiết theo từng mảng:
 
 ## 2. Tech stack
 
-### Backend
-- **FastAPI** (Python) — single process, WebSocket realtime
-- **Cloudflare D1** (SQLite-compatible) — lưu session cache, lịch sử ván, snapshot
-- **Không có auth** — định danh bằng `guest_id` từ localStorage
+### Game Server
+- **boardgame.io** — framework game turn-based: quản lý game state, turn order, multiplayer sync, reconnect tự động
+- **Node.js** — runtime cho boardgame.io server
+- boardgame.io tự tích hợp WebSocket (dùng Socket.io bên dưới) — **không cần tự viết WebSocket**
+
+### Lobby & Session Server
+- **Express** (nhẹ, kèm theo boardgame.io) — serve lobby API: tạo phòng, danh sách phòng, guest session
+- boardgame.io có sẵn `LobbyClient` nhưng mình dùng custom lobby để hỗ trợ guest session (không cần auth)
 
 ### Frontend
 - **React + Vite** — component-based UI, client-side routing
+- **boardgame.io/react** (`Client` component) — kết nối tới boardgame.io server, nhận game state tự động
 - **TailwindCSS** — styling, mobile-first responsive
-- **Framer Motion** — animation (lật thẻ, hiệu ứng trị bệnh, thẻ Episode)
-- **Zustand** — global state (game state, WebSocket events, guest session)
-- **React Query** — fetch API (room config, card data)
+- **Framer Motion** — animation (lật thẻ, hiệu ứng dùng thuốc)
+- **Zustand** — UI state ngoài game (guest session, lobby state)
 - **Cloudflare Pages** — static host cho React build
 
+### Database
+- **PostgreSQL** (Render free tier, 1GB) — lưu lịch sử ván, game logs
+- boardgame.io hỗ trợ pluggable database — dùng **`StorageAPI` custom** để ghi vào PostgreSQL
+
 ### Infrastructure
-- **Render free tier** — host FastAPI backend (512MB RAM, 0.1 vCPU)
-- **Cloudflare Worker (Cron)** — ping `/health` mỗi 10 phút để giữ Render tỉnh
+- **Render** — host Node.js server (boardgame.io + Express lobby), free tier
+- **Cloudflare Worker (Cron)** — ping `/health` mỗi 10 phút giữ Render tỉnh
+
+> **Tại sao PostgreSQL thay vì Cloudflare D1?**
+> boardgame.io server chạy Node.js trên Render — không thể gọi Cloudflare D1 REST API hiệu quả từ đây (latency cao, không có SDK chính thức cho Node). PostgreSQL trên Render cùng datacenter với server → latency thấp, driver native (`pg`) ổn định.
 
 ---
 
@@ -52,134 +60,140 @@ Tài liệu chi tiết theo từng mảng:
 
 ```
 psycheward/
-├── keep_alive/                     # CF Worker giữ Render tỉnh
+├── keep_alive/
 │   ├── worker.js
 │   └── wrangler.toml
 │
-├── backend/
+├── server/                          # Node.js — boardgame.io + Express lobby
 │   ├── .env
 │   ├── .env.example
-│   ├── requirements.txt
-│   ├── config/
-│   │   └── settings.py             # load .env, cấu hình D1 endpoint
-│   ├── main.py                     # FastAPI entrypoint
-│   ├── db/
-│   │   ├── d1_client.py            # HTTP client gọi Cloudflare D1 REST API
-│   │   └── models.py               # dataclass/schema cho từng bảng
-│   ├── session/
-│   │   ├── router.py               # POST /session/init, /session/rename
-│   │   └── service.py              # tạo/validate guest_id, rolling expiry
-│   ├── enums.py
-│   ├── card.py                     # Card dataclass, CardType enum
-│   ├── deck.py                     # Deck builder, shuffle, draw
-│   ├── player.py                   # PlayerState: hand, psyche, status
-│   ├── game.py                     # GameState, vòng lặp lượt đi
-│   ├── resolver.py                 # resolve effect thẻ, tính tác dụng phụ
-│   ├── room_manager.py             # tạo/tìm/xóa phòng, load check
-│   ├── cards/
-│   │   ├── disorders.py            # danh sách Disorder cards
-│   │   ├── drugs.py                # danh sách Drug cards + side effects
-│   │   ├── therapies.py            # danh sách Therapy cards
-│   │   └── episodes.py             # danh sách Episode cards
-│   ├── ws/
-│   │   ├── router.py               # WebSocket endpoint /ws/{room_code}
-│   │   ├── events.py               # định nghĩa các loại event
-│   │   └── broadcaster.py          # gửi event tới toàn phòng hoặc 1 người
-│   └── logs/
-│       └── YYYY-MM-DD.log
+│   ├── package.json
+│   ├── src/
+│   │   ├── index.js                 # Entrypoint: khởi động boardgame.io server + lobby
+│   │   ├── game/
+│   │   │   ├── PsycheWard.js        # boardgame.io Game definition (moves, phases, endIf)
+│   │   │   ├── moves.js             # Tất cả moves: playDrug, playTherapy, playEpisode, pass
+│   │   │   ├── resolver.js          # Pure functions: canCure, applyCure, sideEffects, checkWin
+│   │   │   ├── deck.js              # buildDeck, shuffle, deal
+│   │   │   └── constants.js         # INITIAL_DISORDERS, HAND_SIZE, SIDE_EFFECT_WINDOW, v.v.
+│   │   ├── cards/
+│   │   │   ├── disorders.js         # Disorder card definitions
+│   │   │   ├── drugs.js             # Drug card definitions + side effects
+│   │   │   ├── therapies.js         # Therapy card definitions
+│   │   │   └── episodes.js          # Episode card definitions
+│   │   ├── lobby/
+│   │   │   ├── router.js            # Express routes: /lobby/*, /session/*, /health
+│   │   │   └── guestSession.js      # Validate guest_id, display_name
+│   │   └── db/
+│   │       ├── client.js            # PostgreSQL pool (pg)
+│   │       ├── schema.sql           # CREATE TABLE statements
+│   │       └── gameLogger.js        # Ghi game_records, turn_logs sau mỗi ván
 │
-└── frontend/
-    ├── src/
-    │   ├── main.jsx
-    │   ├── App.jsx                  # React Router v6
-    │   ├── store/
-    │   │   ├── gameStore.js         # Zustand — game state
-    │   │   └── guestStore.js        # Zustand — guest session (display_name, guest_id)
-    │   ├── hooks/
-    │   │   ├── useWebSocket.js      # WS connect, auto-reconnect, dispatch to store
-    │   │   ├── useGameTimer.js      # Countdown timer sync với server
-    │   │   └── useGuestSession.js   # Đọc/ghi localStorage, rolling expiry
-    │   ├── pages/
-    │   │   ├── LandingPage.jsx      # Nhập tên + tạo/vào phòng
-    │   │   ├── RoomPage.jsx         # Phòng chờ + cấu hình
-    │   │   └── GamePage.jsx
-    │   ├── components/
-    │   │   ├── game/
-    │   │   │   ├── PlayerArea.jsx       # Vùng psyche + hand của 1 người chơi
-    │   │   │   ├── CardComponent.jsx    # Render 1 thẻ bài (Disorder/Drug/Episode)
-    │   │   │   ├── CardFlip.jsx         # Animation lật thẻ
-    │   │   │   ├── HandArea.jsx         # Bài trên tay (riêng tư)
-    │   │   │   ├── PsycheArea.jsx       # 4 thẻ bệnh úp ngửa trước mặt (công khai)
-    │   │   │   └── ActionModal.jsx      # Chọn mục tiêu khi dùng thẻ
-    │   │   ├── chat/
-    │   │   │   ├── ChatPanel.jsx
-    │   │   │   ├── ChatBubble.jsx
-    │   │   │   └── SystemBanner.jsx
-    │   │   └── ui/
-    │   │       ├── Timer.jsx
-    │   │       ├── Button.jsx
-    │   │       └── OverloadBanner.jsx
-    │   └── config/
-    │       ├── theme.js             # CSS variables reference
-    │       ├── wsEvents.js          # Enum event types
-    │       └── cardData.js          # Card definitions (mirror từ backend)
-    ├── public/
-    │   ├── logo.png                 # Logo PsycheWard
-    │   └── bg.png                   # Background (nếu dùng ảnh)
-    ├── index.html
+└── client/                          # React + Vite frontend
+    ├── package.json
     ├── vite.config.js
     ├── tailwind.config.js
-    └── package.json
+    ├── index.html
+    └── src/
+        ├── main.jsx
+        ├── App.jsx
+        ├── store/
+        │   └── guestStore.js        # Zustand — guest session (guest_id, display_name)
+        ├── hooks/
+        │   ├── useGuestSession.js   # Đọc/ghi localStorage, rolling expiry
+        │   └── useLobby.js          # Fetch lobby API (tạo phòng, vào phòng)
+        ├── pages/
+        │   ├── LandingPage.jsx      # Nhập tên + tạo/vào phòng
+        │   ├── LobbyPage.jsx        # Danh sách phòng (optional)
+        │   └── GamePage.jsx         # boardgame.io Client wrapper
+        ├── components/
+        │   ├── game/
+        │   │   ├── Board.jsx            # Board component — nhận {G, ctx, moves} từ boardgame.io
+        │   │   ├── PlayerArea.jsx       # Vùng psyche + hand của 1 người chơi
+        │   │   ├── CardComponent.jsx    # Render 1 thẻ bài
+        │   │   ├── CardFlip.jsx         # Animation lật thẻ
+        │   │   ├── HandArea.jsx         # Bài trên tay (riêng tư)
+        │   │   ├── PsycheArea.jsx       # 4 thẻ bệnh úp ngửa (công khai)
+        │   │   └── SideEffectWindow.jsx # Overlay phản ứng tác dụng phụ
+        │   ├── lobby/
+        │   │   ├── RoomList.jsx
+        │   │   └── RoomCard.jsx
+        │   └── ui/
+        │       ├── Timer.jsx
+        │       ├── Button.jsx
+        │       ├── ChatPanel.jsx
+        │       └── SystemBanner.jsx
+        └── config/
+            ├── theme.js             # CSS variable reference
+            └── cardData.js          # Card definitions (mirror từ server/cards/)
 ```
 
 ---
 
 ## 4. Quyết định kiến trúc quan trọng
 
-### 4.1 Không có đăng nhập — guest session qua localStorage
+### 4.1 boardgame.io làm gì
 
-Mỗi lần truy cập, `useGuestSession.js` kiểm tra `localStorage`:
-- Nếu chưa có → tạo `guest_id` (UUID v4) + gợi ý tên tự động → lưu vào `localStorage`.
-- Nếu có nhưng đã quá 14 ngày kể từ `last_seen` → reset, tạo mới.
-- Nếu có và còn hạn → cập nhật `last_seen`, dùng tiếp.
+boardgame.io xử lý sẵn:
+- **Game state sync** — `G` (game state) tự đồng bộ tới tất cả client sau mỗi move
+- **Turn management** — `ctx.currentPlayer`, `ctx.turn`, `ctx.phase` tự quản lý
+- **Move validation** — move chỉ được gọi đến server, FE không thể tự sửa state
+- **Multiplayer** — Socket.io bên dưới, boardgame.io lo reconnect và state recovery
+- **Secret state** — `playerView` filter: hand của mỗi người chỉ gửi đến đúng người đó
+- **Active players** — Side Effect Window dùng `activePlayers` để cho nhiều người cùng phản ứng đồng thời
 
-Backend nhận `guest_id` qua WebSocket handshake header. Không cần JWT, không cần cookie. `guest_id` là định danh duy nhất trong phòng — không cần unique toàn hệ thống, chỉ cần unique trong phòng đang chơi.
+### 4.2 Những gì mình tự viết
 
-### 4.2 Dev mode — bỏ giới hạn phòng
+- **Game logic** (moves, resolver) — boardgame.io là framework, không có logic game
+- **Card definitions** — disorders, drugs, therapies, episodes
+- **Deck building** — shuffle, deal
+- **Lobby + guest session** — boardgame.io lobby mặc định cần auth; mình tự viết để hỗ trợ guest
+- **UI/Board component** — toàn bộ frontend
 
-Khi `DEV_MODE=true` trong `.env`:
-- Không check `can_accept_connection()` → không có giới hạn phòng/người.
-- Log rõ `[DEV MODE] load check skipped` để không nhầm lẫn với production.
-- Giới hạn phòng và số người vẫn đọc từ config nhưng không enforce.
+### 4.3 Guest session
 
-### 4.3 Hand riêng tư, Psyche công khai
+`guest_id` (UUID v4) gửi kèm khi join match qua boardgame.io `Client`:
 
-- **Hand (bài trên tay):** chỉ gửi qua WebSocket đến đúng người đó — người khác không thấy.
-- **Psyche (4 thẻ bệnh trước mặt):** broadcast công khai cho toàn phòng — mọi người đều biết bạn đang bệnh gì.
-- BE là source of truth cho toàn bộ GameState — FE chỉ nhận event và render.
+```javascript
+// client/src/pages/GamePage.jsx
+const client = Client({
+  game: PsycheWardGame,
+  board: Board,
+  multiplayer: SocketIO({ server }),
+});
 
-### 4.4 Host = người chơi có quyền cấu hình
-
-Host tạo phòng, ngồi vào bàn, chơi cùng. Có thêm quyền: chỉnh tùy chọn ván (ngay tại màn hình chờ), kick người chưa sẵn sàng, bắt đầu ván, kết thúc sớm. Sau khi ván bắt đầu, Host không có thông tin đặc quyền hơn người khác.
-
-### 4.5 Load check trước khi cho join
-
-```python
-import psutil
-
-def can_accept_connection() -> bool:
-    return (
-        psutil.virtual_memory().percent < 80 and
-        psutil.cpu_percent(interval=0.1) < 85
-    )
+// Truyền playerID = guest_id vào Client
+<client.Client playerID={guestId} matchID={roomCode} />
 ```
 
-Nếu vượt ngưỡng → trả về thông báo hài hước thay vì để server crash. Bỏ qua check này khi `DEV_MODE=true`.
+Server dùng `playerID` để định danh người chơi trong `G` và `ctx`. Không cần JWT, không cần cookie.
 
-### 4.6 Game state persistence vào D1
+### 4.4 Secret state — hand riêng tư
 
-Snapshot GameState sau mỗi lượt đi xong (kết thúc action của 1 người) và cuối mỗi vòng. Encrypt AES-256 trước khi ghi. Khi server restart, Host reconnect và thấy nút Resume. Chi tiết tại `03_game_engine.md`.
+boardgame.io có `playerView` để filter state trước khi gửi về client:
 
-### 4.7 Chat có thanh cuộn
+```javascript
+// server/src/game/PsycheWard.js
+const PsycheWard = {
+  playerView: (G, ctx, playerID) => {
+    // Ẩn tay bài của người khác
+    const filtered = { ...G };
+    filtered.players = G.players.map((p, i) => {
+      if (String(i) === playerID) return p;          // tay mình → full
+      return { ...p, hand: p.hand.map(() => null) }; // tay người khác → null
+    });
+    return filtered;
+  },
+};
+```
 
-Panel chat hỗ trợ cuộn (overflow-y: auto + max-height cố định). Tin nhắn mới tự cuộn xuống cuối, nhưng nếu người chơi đang cuộn lên đọc lại thì không tự nhảy xuống — chỉ cuộn tự động khi người chơi đang ở cuối feed.
+### 4.5 Dev mode
+
+`DEV_MODE=true` trong `.env`:
+- Bỏ giới hạn số phòng
+- boardgame.io dev server (`npm run dev`) bật sẵn debug panel tại `localhost:8000`
+- Log level `DEBUG`
+
+### 4.6 Chat
+
+boardgame.io không có chat built-in. Dùng Socket.io custom event song song với boardgame.io connection — cùng server, khác namespace: `/chat`.

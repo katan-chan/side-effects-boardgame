@@ -154,4 +154,8 @@ supabase/.temp/
 
 .env
 
+files/
+
 *.zip
+
+template.md
