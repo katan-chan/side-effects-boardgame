@@ -1,0 +1,21 @@
+/* ── Card Backs ── */
+.card-back {
+  width: var(--card-back-w); height: var(--card-back-h);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0.08rem;
+  border-radius: var(--card-radius);
+  border: 1px solid rgba(20,184,166,.4);
+  background: repeating-linear-gradient(135deg, rgba(20,184,166,.15) 0 8px, rgba(13,148,136,.1) 8px 16px);
+  overflow: hidden;
+}
+.card-back-mark { font-size: max(0.9rem, calc(var(--card-back-w) * 0.19)); color: var(--teal); }
+.card-back small {
+  font-size: max(0.5rem, calc(var(--card-back-w) * 0.093));
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+.card-back strong { font-size: max(0.9rem, calc(var(--card-back-w) * 0.19)); color: var(--text-strong); }

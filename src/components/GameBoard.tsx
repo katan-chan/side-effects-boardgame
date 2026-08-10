@@ -12,7 +12,9 @@ import { getCardDefinition } from '../game/cards/catalog'
 import { GameCard } from './cards/GameCard'
 import { CardBack } from './cards/CardBack'
 import { OpponentAvatarBar } from './OpponentAvatarBar'
+import { OpponentHand } from './OpponentHand'
 import { GameLogDrawer } from './GameLogDrawer'
+import { PlayerSidebar } from './sidebar/PlayerSidebar'
 import { GhostLayer, triggerGhost } from './GhostLayer'
 import { useGameAudio } from '../audio/useGameAudio'
 import { audioManager } from '../audio/audioManager'
@@ -191,6 +193,15 @@ export function GameBoard(props: GameBoardProps) {
     opponents.find((player) => player.id === focusedOpponentId) ??
     opponents.find((player) => player.id === game.currentPlayerId) ??
     opponents[0]
+  // The resolved id, not the raw state: before the first click focusedOpponentId
+  // is undefined while an opponent is already being shown, so highlighting off
+  // the raw state would leave the watched player unmarked at game start.
+  const watchedOpponentId = focusedOpponent?.id
+  const watchedHandCount = focusedOpponent
+    ? 'handCount' in focusedOpponent
+      ? focusedOpponent.handCount
+      : (focusedOpponent.hand?.length ?? 0)
+    : 0
 
   useEffect(() => {
     // Unlock interaction when game state changes (server responded)
@@ -267,6 +278,15 @@ export function GameBoard(props: GameBoardProps) {
       className={`game-board ${isTargetingMode ? 'targeting-mode' : ''} ${isLocked ? 'interaction-locked' : ''}`}
       onClick={handleBackgroundClick}
     >
+      <PlayerSidebar
+        player={viewer}
+        isViewerTurn={isViewerTurn}
+        currentPlayerName={current.name}
+        phase={game.turn.phase}
+        cardsPlayedThisTurn={game.turn.cardsPlayedThisTurn}
+        turnNumber={game.turnNumber}
+        gameLog={props.gameLog}
+      />
       <div className="top-actions" onClick={(event) => event.stopPropagation()}>
         {props.onLeave && (
           <button type="button" className="btn-danger top-action-btn" onClick={props.onLeave}>
@@ -292,28 +312,31 @@ export function GameBoard(props: GameBoardProps) {
         {opponents.length > 1 && (
           <OpponentAvatarBar
             opponents={opponents}
-            focusedOpponentId={focusedOpponentId}
+            focusedOpponentId={watchedOpponentId}
             setFocusedOpponentId={handleTargetOpponent}
             targetPlayerId={
-              isTargetingMode && selectedCard?.cardType === 'disorder' ? focusedOpponentId : undefined
+              isTargetingMode && selectedCard?.cardType === 'disorder' ? watchedOpponentId : undefined
             }
             currentPlayerId={game.currentPlayerId}
           />
         )}
         {focusedOpponent && (
-          <article 
+          <article
             className={`player opponent-player ${isTargetingMode && selectedCard?.cardType === 'disorder' ? 'target-highlight targetable' : ''}`}
             onClick={(e) => {
               e.stopPropagation()
               handleTargetOpponent(focusedOpponent.id)
             }}
           >
-            {opponents.length === 1 && (
-              <header className="opponent-header" style={{ marginBottom: '1rem', color: '#9bf6e5', fontWeight: 'bold' }}>
-                {focusedOpponent.name} — {t('hand')}: {'handCount' in focusedOpponent ? focusedOpponent.handCount : focusedOpponent.hand?.length}
-              </header>
-            )}
-            {selectedCard?.cardType === 'disorder' && isViewerTurn && focusedOpponent.id === focusedOpponentId && (
+            <header className="opponent-header">
+              <strong>{focusedOpponent.name}</strong>
+            </header>
+            <OpponentHand
+              count={watchedHandCount}
+              playerName={focusedOpponent.name}
+              playerId={focusedOpponent.id}
+            />
+            {selectedCard?.cardType === 'disorder' && isViewerTurn && (
               <button
                 type="button"
                 className="primary apply-card-btn"

@@ -1,0 +1,101 @@
+/* ── Reset ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  color: var(--text);
+  min-height: 100dvh;
+  background: radial-gradient(ellipse at top, var(--bg-from) 0%, var(--bg-to) 100%) fixed;
+  position: relative;
+  font-weight: 400;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  overflow-x: hidden;
+}
+
+/* Subtle dot-grid texture */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  z-index: 0;
+  background-image: radial-gradient(circle at 50% 50%, #fff 1px, transparent 1.5px);
+  background-size: 44px 44px;
+}
+
+a { text-decoration: none; color: inherit; }
+button, input, select { font: inherit; font-weight: 500; }
+
+
+/* ── Buttons ── */
+button {
+  min-height: 2.75rem;
+  cursor: pointer;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 1.1rem;
+  background: var(--input-bg);
+  color: var(--text-strong);
+  transition: border-color .18s, transform .18s, background .18s, opacity .18s, box-shadow .18s;
+}
+button:hover:not(:disabled), button:focus-visible {
+  border-color: rgba(20, 184, 166, 0.5);
+  background: rgba(255,255,255,0.08);
+  box-shadow: 0 0 10px rgba(20, 184, 166, 0.2);
+}
+button:active:not(:disabled) { transform: translateY(1px); }
+button:disabled { cursor: not-allowed; opacity: 0.42; }
+
+.primary {
+  background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+  color: #02171a;
+  border: none;
+  font-weight: 800;
+  box-shadow: 0 10px 26px rgba(20, 184, 166, 0.3);
+}
+.primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+  box-shadow: 0 14px 32px rgba(20, 184, 166, 0.45);
+}
+
+.btn-danger {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--red);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.btn-danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+
+/* ── Glass panel ── */
+.panel {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 2rem 2.2rem;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+}
+.panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% -10%, rgba(20,184,166,.14), transparent 50%);
+}
+.panel > * { position: relative; z-index: 1; }
+
+
+/* ── Gradient text ── */
+.gradient-text, h1.gradient {
+  background: linear-gradient(90deg, #f8fafc, var(--teal) 55%, var(--green));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  display: inline-block;
+}

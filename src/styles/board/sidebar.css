@@ -1,0 +1,202 @@
+/* ============================================================
+   PLAYER SIDEBAR
+   ============================================================ */
+
+:root {
+  /* Single sizing knob for the sidebar column, like --card-w is for cards. */
+  --sidebar-w: clamp(13rem, 15vw, 19rem);
+}
+
+.player-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--card-border);
+  background: rgba(2, 12, 11, 0.35);
+  backdrop-filter: blur(6px);
+  padding: var(--zone-pad);
+  gap: 0.7rem;
+  position: relative;
+  z-index: 3;
+}
+
+/* Each half of the sidebar is its own card, so the status section and the
+   log section are unmistakably two separate panels rather than one block
+   split by a hairline. */
+.sidebar-self,
+.sidebar-log {
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  padding: 0.7rem;
+}
+
+/* ── Self summary (fixed height) ── */
+.sidebar-self {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--board-gap);
+}
+
+.self-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.self-avatar {
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+  color: #02171a;
+  font-size: 1rem;
+  font-weight: bold;
+  flex: 0 0 auto;
+}
+.self-identity {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  min-width: 0;
+}
+.self-identity strong {
+  font-size: 0.95rem;
+  color: var(--text-strong);
+}
+.self-identity small {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.self-turn {
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.self-turn.is-active {
+  color: var(--teal);
+  background: rgba(20, 184, 166, 0.12);
+  border: 1px solid rgba(20, 184, 166, 0.35);
+}
+.self-turn.is-idle {
+  color: var(--text-muted);
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid var(--card-border);
+}
+.self-turn-label {
+  font-size: 0.85rem;
+}
+.self-turn-meta {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.sidebar-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  font-weight: 800;
+  margin: 0 0 0.4rem;
+}
+
+/* Only the top-level headings get a coloured accent bar, so the nested
+   "Cơn đang tác dụng" heading stays visibly secondary. Different accent
+   colours tell the status panel and the log panel apart at a glance. */
+.sidebar-self > .sidebar-heading::before,
+.sidebar-log > .sidebar-heading::before {
+  content: '';
+  width: 3px;
+  height: 0.85em;
+  border-radius: 2px;
+  flex: 0 0 auto;
+}
+.sidebar-self > .sidebar-heading::before {
+  background: var(--teal);
+}
+.sidebar-log > .sidebar-heading::before {
+  background: var(--yellow);
+}
+
+.self-episodes { display: flex; flex-direction: column; }
+.self-episodes .sidebar-heading { margin-top: 0.2rem; }
+.episode-effects {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+}
+.episode-effect {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background: rgba(248, 113, 113, 0.10);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  font-size: 0.8rem;
+}
+.episode-effect-icon { flex: 0 0 auto; }
+.episode-effect-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text);
+}
+.episode-effect-count {
+  flex: 0 0 auto;
+  font-weight: 700;
+  color: var(--orange);
+}
+.episode-empty {
+  font-size: 0.78rem;
+  color: var(--text-faint);
+  margin: 0;
+}
+
+/* ── Game log (fills remaining height) ──
+   The list (not this section) is the scroll container, so the
+   "NHẬT KÝ VÁN CHƠI" heading stays pinned while entries accumulate
+   downward and scroll underneath it. */
+.sidebar-log {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.sidebar-log .sidebar-heading {
+  flex: 0 0 auto;
+}
+
+.game-log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.82rem;
+  color: var(--text-strong);
+  line-height: 1.45;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.game-log-list::-webkit-scrollbar { display: none; }
+.game-log-list li {
+  padding: 0.45rem 0;
+}
+.game-log-list li:not(:first-child) {
+  border-top: 1px solid var(--card-border);
+}
+/* Emphasised spans (card/disorder/player names) need more than weight alone
+   to stand out against the already-bright body text, so they take the teal
+   accent used elsewhere in the sidebar. */
+.game-log-list strong { font-weight: 800; color: var(--teal); }

@@ -15,10 +15,11 @@ import {
   forfeitGame as forfeitGameCommand,
 } from '../game/engine/turns'
 import type { GameState } from '../game/engine/types'
+import { describeCommand } from '../game/log/describeCommand'
 import { t } from '../i18n'
+import type { GameCommand } from '../../server/game/commands'
 
 type StoreAction = (game: GameState) => GameState
-type LogDescription = (before: GameState, after: GameState) => string
 
 interface GameStore {
   gameState?: GameState
@@ -50,12 +51,12 @@ function errorMessage(error: unknown): string {
 }
 
 export const useGameStore = create<GameStore>((set, get) => {
-  const run = (action: StoreAction, describe?: LogDescription) => {
+  const run = (action: StoreAction, command: GameCommand) => {
     const game = get().gameState
     if (!game) return
     try {
       const nextGame = action(game)
-      const entry = describe?.(game, nextGame)
+      const entry = describeCommand(game, command, nextGame)
       const winner =
         nextGame.status === 'finished'
           ? nextGame.players.find(
@@ -92,11 +93,7 @@ export const useGameStore = create<GameStore>((set, get) => {
       }
     },
     draw: () =>
-      run(
-        (game) => drawForTurn(game, game.currentPlayerId),
-        (before, after) =>
-          t('logDrew', { player: before.players[before.currentPlayerIndex].name, count: after.turn.cardsDrawnThisTurn - before.turn.cardsDrawnThisTurn }),
-      ),
+      run((game) => drawForTurn(game, game.currentPlayerId), { type: 'draw' }),
     playDrug: (drugCardId, disorderCardId) =>
       run(
         (game) =>
@@ -106,8 +103,7 @@ export const useGameStore = create<GameStore>((set, get) => {
             drugCardId,
             disorderCardId,
           ),
-        (before) =>
-          t('logDrug', { player: before.players[before.currentPlayerIndex].name }),
+        { type: 'playDrug', drugCardId, disorderCardId },
       ),
     playDisorder: (disorderCardId, targetPlayerId) =>
       run(
@@ -118,8 +114,7 @@ export const useGameStore = create<GameStore>((set, get) => {
             disorderCardId,
             targetPlayerId,
           ),
-        (before) =>
-          t('logDisorder', { player: before.players[before.currentPlayerIndex].name }),
+        { type: 'playDisorder', disorderCardId, targetPlayerId },
       ),
     playEpisode: (
       episodeCardId,
@@ -137,8 +132,7 @@ export const useGameStore = create<GameStore>((set, get) => {
             targetDisorderCardId,
             options,
           ),
-        (before) =>
-          t('logEpisode', { player: before.players[before.currentPlayerIndex].name }),
+        { type: 'playEpisode', episodeCardId, targetPlayerId, targetDisorderCardId },
       ),
     playTherapy: (therapyCardId, disorderCardId) =>
       run(
@@ -149,31 +143,27 @@ export const useGameStore = create<GameStore>((set, get) => {
             therapyCardId,
             disorderCardId,
           ),
-        (before) =>
-          t('logTherapy', { player: before.players[before.currentPlayerIndex].name }),
+        { type: 'playTherapy', therapyCardId, disorderCardId },
       ),
     discard: (cardInstanceId) =>
       run(
         (game) =>
           discardCardCommand(game, game.currentPlayerId, cardInstanceId),
-        (before) =>
-          t('logDiscard', { player: before.players[before.currentPlayerIndex].name }),
+        { type: 'discard', cardInstanceId },
       ),
     manualDiscard: (cardInstanceId) =>
       run(
         (game) => discardManualCommand(game, game.currentPlayerId, cardInstanceId),
-        (before) => t('logDiscard', { player: before.players[before.currentPlayerIndex].name }),
+        { type: 'discardManual', cardInstanceId },
       ),
     endTurn: () =>
-      run(
-        (game) => endTurnCommand(game, game.currentPlayerId),
-        (before) =>
-          t('logEndTurn', { player: before.players[before.currentPlayerIndex].name }),
-      ),
+      run((game) => endTurnCommand(game, game.currentPlayerId), {
+        type: 'endTurn',
+      }),
     forfeit: () =>
-      run(
-        (game) => forfeitGameCommand(game, game.currentPlayerId),
-      ),
+      run((game) => forfeitGameCommand(game, game.currentPlayerId), {
+        type: 'forfeit',
+      }),
     resetGame: () =>
       set({ gameState: undefined, error: undefined, gameLog: [] }),
     clearError: () => set({ error: undefined }),

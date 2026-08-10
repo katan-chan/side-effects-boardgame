@@ -1,0 +1,235 @@
+/* ============================================================
+   GAME BOARD
+   ============================================================ */
+
+.game-board {
+  width: 100%;
+  /* Height must be definite (not min-height/auto), or the 1fr row below
+     resolves against max-content instead of leftover space. Deliberately no
+     overflow:hidden here — clipping would hide a layout regression instead of
+     showing it. */
+  height: 100dvh;
+  display: grid;
+  /* Row 1 takes exactly what the opponent zone needs (its content is bounded:
+     one row of cards plus an optional avatar bar), row 2 is the deck, and the
+     self zone absorbs whatever is left. Everything scales with --card-w. */
+  /* Both player rows size to their content and the DECK row absorbs the slack.
+     The reverse (deck fixed, self zone 1fr) breaks as soon as a row grows: the
+     self zone is justify-content:flex-end, so once its content exceeds 1fr it
+     overflows upward and the nameplate lands on top of the deck. */
+  grid-template-rows:
+    auto
+    minmax(var(--card-back-h), 1fr)
+    auto;
+  /* Sidebar column plus the board column; the sidebar spans all three rows
+     (see .player-sidebar below) while opponent/center/self stay in column 2. */
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  background: transparent;
+  box-shadow: inset 0 0 100px #000a;
+  position: relative;
+  z-index: 1;
+}
+.game-board.interaction-locked { pointer-events: none; }
+.game-board.targeting-mode .opponent-zone,
+.game-board.targeting-mode .self-zone { background: rgba(0,0,0,.15); transition: background 0.2s; }
+
+/* Sidebar spans all three board rows in column 1; the board content
+   (opponent/center/self) lives in column 2. */
+.player-sidebar { grid-column: 1; grid-row: 1 / -1; }
+.opponent-zone,
+.center-zone,
+.self-zone { grid-column: 2; }
+
+/* connection status bar */
+.connection-status {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 0.4rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--teal);
+  background: rgba(2,6,23,.7);
+  border-bottom: 1px solid var(--card-border);
+  backdrop-filter: blur(10px);
+}
+
+/* ── Opponent Zone ── */
+.opponent-zone {
+  padding: var(--zone-pad);
+  display: flex;
+  flex-direction: column;
+  gap: var(--board-gap);
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  z-index: 2;
+}
+.opponent-avatar-bar {
+  display: flex;
+  /* Never shrink: the zone is a flex column with overflow:hidden, so a
+     squeezed bar is not a smaller bar, it is a clipped one. */
+  flex: 0 0 auto;
+  gap: 0.8rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 0.5rem;
+  justify-content: flex-start;
+  scroll-snap-type: x mandatory;
+}
+.opponent-avatar-bar::-webkit-scrollbar { display: none; }
+
+.opponent-avatar {
+  scroll-snap-align: center;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(6, 20, 18, 0.75);
+  border: 1px solid var(--card-border);
+  backdrop-filter: blur(4px);
+  border-radius: 999px;
+  padding: 0.4rem 1rem 0.4rem 0.4rem;
+  transition: all 0.2s;
+}
+/* Watched (focused) reads louder than current-turn below: both use teal, so
+   the watched player gets a solid ring the turn glow does not have. */
+.opponent-avatar.focused {
+  border-color: var(--teal);
+  background: rgba(19, 51, 46, 0.95);
+  box-shadow: 0 0 0 2px var(--teal), 0 0 18px rgba(20,184,166,.45);
+}
+.opponent-avatar.focused .avatar-icon { box-shadow: 0 0 0 2px rgba(226,232,240,.35); }
+.avatar-watching-dot { font-size: 0.8rem; line-height: 1; margin-right: -0.2rem; }
+.opponent-avatar.targeted {
+  border-color: var(--yellow);
+  box-shadow: 0 0 15px rgba(234,179,8,.5);
+}
+.opponent-avatar.current-turn {
+  box-shadow: 0 0 15px rgba(20,184,166,.35);
+  border-color: var(--teal);
+}
+.avatar-icon {
+  display: grid;
+  place-items: center;
+  width: 2rem; height: 2rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+  color: #02171a;
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+.avatar-info { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.1; }
+.avatar-info strong { font-size: 0.9rem; color: var(--text-strong); }
+.avatar-info small { font-size: 0.7rem; color: var(--text-muted); }
+.avatar-effects { display: flex; gap: 0.2rem; font-size: 0.8rem; }
+
+/* ── Player rows ──
+   Same three-column shape as .hand-and-controls: name in the left gutter,
+   cards centred in the middle. The name then costs no row of its own, and the
+   left gutter — until now empty purely for symmetry — carries it.
+   Name only, no hand count: the avatar bar already shows the count and the
+   face-down hand spells it out card for card.
+   No frame on the article itself either: it is block-level, so a border
+   stretches the full zone width into a box that reads as a container rather
+   than a highlight. */
+.player {
+  display: grid;
+  grid-template-columns: var(--controls-space) minmax(0, 1fr) var(--controls-space);
+  align-items: start;
+  row-gap: var(--board-gap);
+  column-gap: 0.5rem;
+  width: 100%;
+}
+.player > .psyche,
+.player > .opponent-hand,
+.player > .apply-card-btn { grid-column: 2; }
+
+.opponent-header,
+.own-nameplate {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center;
+  margin: 0;
+  text-align: left;
+  font-size: 0.85rem;
+  line-height: 1.25;
+  overflow-wrap: break-word;
+}
+.opponent-header strong { color: var(--text-strong); }
+
+/* ── Center Zone ── */
+.center-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--zone-pad);
+  background: radial-gradient(ellipse at center, rgba(10,31,27,.5), transparent 70%);
+  position: relative;
+  z-index: 1;
+  min-height: 0;
+}
+.deck-area {
+  display: flex;
+  gap: clamp(1rem, 4vw, 4rem);
+  justify-content: center;
+  align-items: center;
+  perspective: 1000px;
+}
+.draw-pile {
+  position: relative;
+  box-shadow: -2px 2px 0 #05100f, -4px 4px 0 #102926, -6px 6px 0 #05100f, -8px 8px 0 #102926, -10px 10px 15px #0008;
+  transform: rotateX(10deg) rotateZ(-2deg);
+  transition: transform 0.2s, box-shadow 0.2s;
+  border-radius: 0.6rem;
+  z-index: var(--z-base);
+  border: none;
+  background: none;
+  min-height: unset;
+  padding: 0;
+}
+.draw-pile:hover:not(:disabled) {
+  transform: rotateX(10deg) rotateZ(-2deg) translateY(-5px);
+  box-shadow: -2px 2px 0 #05100f, -4px 4px 0 #102926, -6px 6px 0 #05100f, -8px 8px 0 #102926, -15px 15px 25px #000a;
+}
+.draw-pile:active:not(:disabled) { transform: rotateX(10deg) rotateZ(-2deg) translateY(2px); transition: 0.05s; }
+.discard-pile {
+  box-shadow: 0 4px 12px #0008;
+  transform: rotateX(5deg) rotateZ(3deg);
+  opacity: 0.9;
+  border-radius: 0.6rem;
+  transition: transform 0.2s;
+  z-index: var(--z-base);
+}
+
+/* ── Self Zone ── */
+.self-zone {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  padding: var(--zone-pad);
+  gap: var(--board-gap);
+  min-height: 0;
+  position: relative;
+  z-index: 2;
+}
+
+.hud-glass {
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+  padding: 0.4rem 1rem;
+  background: rgba(11, 32, 30, 0.92);
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+  backdrop-filter: blur(4px);
+  transition: color 0.3s;
+}
+.hud-glass strong { color: var(--teal); }
+.hud-glass .divider { color: var(--text-faint); }
+.own-nameplate { color: var(--teal); }

@@ -1,0 +1,92 @@
+/* ── Online lobby — room code / player list ── */
+.room-code-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: rgba(20,184,166,.08);
+  border: 1px solid rgba(20,184,166,.3);
+  border-radius: 14px;
+  padding: 0.7rem 1rem;
+  margin-bottom: 0.8rem;
+}
+.room-code-card .lbl {
+  font-size: 0.7rem;
+  color: var(--text-faint);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: block;
+}
+.room-code {
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: 0.24em;
+  color: var(--teal);
+}
+.copy-btn {
+  background: var(--input-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  min-height: unset;
+  transition: .18s;
+}
+.copy-btn:hover { color: var(--teal); border-color: rgba(20,184,166,.4); }
+
+.conn-line {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+.conn-line strong { color: var(--teal); }
+
+.lobby-players {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+.lobby-players li {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  background: var(--input-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.9rem;
+}
+.player-avatar {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  color: #02171a;
+  flex: 0 0 auto;
+  font-size: 0.9rem;
+  background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+}
+.player-name-wrap { font-weight: 800; color: var(--text-strong); font-size: 0.9rem; flex: 1; }
+.host-tag {
+  font-size: 0.6rem; font-weight: 800; color: #ffd700;
+  border: 1px solid rgba(234,179,8,.45);
+  background: rgba(234,179,8,.15);
+  padding: 0.08rem 0.4rem; border-radius: 999px;
+  margin-left: 0.35rem;
+}
+.me-tag {
+  font-size: 0.6rem; font-weight: 800; color: var(--teal);
+  border: 1px solid rgba(20,184,166,.4);
+  background: rgba(20,184,166,.1);
+  padding: 0.08rem 0.4rem; border-radius: 999px;
+  margin-left: 0.35rem;
+}
+.player-status { margin-left: auto; font-size: 0.72rem; font-weight: 700; color: var(--text-faint); }
+.player-status.ready { color: var(--yellow); }
+.player-status.connected { color: var(--teal); }
+.lobby-hint { margin-top: 0.9rem; text-align: center; font-size: 0.76rem; color: var(--text-faint); }
