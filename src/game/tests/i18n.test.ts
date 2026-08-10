@@ -4,6 +4,7 @@ import { defaultLocale, disorderName, localizeError, t } from '../../i18n'
 describe('Vietnamese localization', () => {
   it('uses Vietnamese as the default locale with localized Disorder names', () => {
     expect(defaultLocale).toBe('vi')
+    expect(t('title')).toBe('Side Effect')
     expect(disorderName('gambling-addiction')).toBe('Nghiện cờ bạc')
     expect(disorderName('suicidal-thoughts')).toBe('Ý nghĩ tự sát')
   })

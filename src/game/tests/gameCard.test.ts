@@ -76,8 +76,13 @@ describe('card information presentation', () => {
     expect(render('therapy', 'therapy', 'Therapy')).toContain(
       'card-frame-therapy',
     )
-    expect(
-      renderToStaticMarkup(createElement(CardBack, { label: 'Chồng bài rút', count: 12 })),
-    ).toContain('card-back')
+    const cardBack = renderToStaticMarkup(
+      createElement(CardBack, { label: 'Chồng bài rút', count: 12 }),
+    )
+    expect(cardBack).toContain('card-back')
+    expect(cardBack).toContain('Side Effect')
+    expect(render('madness-treatment', 'drug', 'Chlorpromazine')).toContain(
+      'Tác dụng phụ',
+    )
   })
 })
