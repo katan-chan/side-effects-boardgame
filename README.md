@@ -52,6 +52,10 @@ The project is split into a small full-stack TypeScript architecture:
 * **Card-driven Gameplay**: Drug, disorder, therapy, and episode card interactions.
 * **Test Coverage**: Client, engine, and server behavior are covered by automated tests.
 
+<p align="center">
+  <img src="images/screenshot.png" alt="Side Effects Boardgame screenshot" />
+</p>
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ---
