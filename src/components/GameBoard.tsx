@@ -337,6 +337,30 @@ export function GameBoard(props: GameBoardProps) {
         </article>
         
         <div className="hand-and-controls">
+          {isTargetingMode && (
+            <button 
+              type="button" 
+              className="cancel-target-btn mobile-only" 
+              onClick={() => {
+                audioManager.play('click')
+                setSelectedCardId(undefined)
+              }}
+              style={{
+                position: 'absolute',
+                top: '-3rem',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 100,
+                borderRadius: '99px',
+                padding: '0.4rem 1.2rem',
+                backgroundColor: '#a42c2c',
+                borderColor: '#e84848',
+                boxShadow: '0 4px 12px #000a'
+              }}
+            >
+              ✖ {t('cancel')}
+            </button>
+          )}
           <section className="hand own-hand" id="own-hand">
             <div className="cards">
               {viewerHand.map((card) => (
