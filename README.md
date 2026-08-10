@@ -26,3 +26,11 @@ For durable online rooms, create a Supabase project, run
 `supabase/migrations/001_initial.sql`, then set server-only `SUPABASE_URL` and
 `SUPABASE_SECRET_KEY`. Production startup requires both variables; development
 uses in-memory persistence when they are absent.
+
+## Multiplayer sessions
+
+The server issues each room participant an opaque session credential and stores
+only its hash in room snapshots. Browsers retain the credential in
+`sessionStorage` so a reload can resume the same slot. A lost credential cannot
+be recovered in v1. Snapshots created before session-auth schema v2 are skipped
+on restore rather than falling back to playerId-only reconnects.

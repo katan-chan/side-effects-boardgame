@@ -2,8 +2,7 @@ import { io, type Socket } from 'socket.io-client'
 import type { GameCommand } from '../../server/game/commands'
 import type { PlayerGameView } from '../../server/game/playerView'
 
-const PLAYER_ID_KEY = 'side-effects.player-id'
-const SESSION_KEY = 'side-effects.room-session'
+export const SESSION_KEY = 'side-effect.room-session'
 export const multiplayerServerUrl =
   import.meta.env.VITE_MULTIPLAYER_SERVER_URL ?? 'http://localhost:3001'
 
@@ -23,6 +22,7 @@ export interface RoomView {
 export interface MultiplayerSession {
   roomId: string
   playerId: string
+  sessionToken: string
 }
 
 export interface MultiplayerClientHandlers {
@@ -38,28 +38,29 @@ function storage(): Storage | undefined {
   return typeof window === 'undefined' ? undefined : window.sessionStorage
 }
 
-export function getStablePlayerId(): string {
-  const sessionStorage = storage()
-  const existing = sessionStorage?.getItem(PLAYER_ID_KEY)
-  if (existing) return existing
-  const playerId =
-    globalThis.crypto?.randomUUID?.() ?? `player-${Date.now()}-${Math.random()}`
-  sessionStorage?.setItem(PLAYER_ID_KEY, playerId)
-  return playerId
-}
-
 export function getSavedSession(): MultiplayerSession | undefined {
   const raw = storage()?.getItem(SESSION_KEY)
   if (!raw) return undefined
   try {
-    return JSON.parse(raw) as MultiplayerSession
+    const session = JSON.parse(raw) as Partial<MultiplayerSession>
+    if (
+      typeof session.roomId !== 'string' ||
+      typeof session.playerId !== 'string' ||
+      typeof session.sessionToken !== 'string'
+    )
+      return undefined
+    return session as MultiplayerSession
   } catch {
     return undefined
   }
 }
 
-function saveSession(session: MultiplayerSession): void {
+export function saveSession(session: MultiplayerSession): void {
   storage()?.setItem(SESSION_KEY, JSON.stringify(session))
+}
+
+export function clearSavedSession(): void {
+  storage()?.removeItem(SESSION_KEY)
 }
 
 /** Thin transport adapter. The server remains the source of truth for all game state. */
@@ -68,36 +69,43 @@ export function createMultiplayerClient(
   handlers: MultiplayerClientHandlers = {},
 ) {
   const socket: Socket = io(url, { autoConnect: false })
-  const playerId = getStablePlayerId()
+  let resumingSession = false
   if (handlers.onRoomState) socket.on('room:state', handlers.onRoomState)
   if (handlers.onGameState) socket.on('game:state', handlers.onGameState)
-  if (handlers.onError) socket.on('game:error', handlers.onError)
+  socket.on('game:error', (message: string) => {
+    if (resumingSession) {
+      clearSavedSession()
+      resumingSession = false
+    }
+    handlers.onError?.(message)
+  })
   if (handlers.onGameLog) socket.on('game:log', handlers.onGameLog)
   socket.on('session:restored', (session: MultiplayerSession) => {
     saveSession(session)
+    resumingSession = false
     handlers.onSessionRestored?.(session)
   })
   socket.on('connect', () => {
     handlers.onConnectionState?.('connected')
     const session = getSavedSession()
-    if (session?.playerId === playerId) socket.emit('session:resume', session)
+    if (session) {
+      resumingSession = true
+      socket.emit('session:resume', session)
+    }
   })
   socket.on('disconnect', () => handlers.onConnectionState?.('disconnected'))
   socket.on('connect_error', () => handlers.onConnectionState?.('unavailable'))
 
   return {
-    playerId,
     connect: () => {
       handlers.onConnectionState?.('connecting')
       socket.connect()
     },
     disconnect: () => socket.disconnect(),
-    createRoom: (displayName: string) =>
-      socket.emit('room:create', { displayName, playerId }),
+    createRoom: (displayName: string) => socket.emit('room:create', { displayName }),
     joinRoom: (roomId: string, displayName: string) =>
       socket.emit('room:join', {
         roomId: roomId.trim().toUpperCase(),
-        playerId,
         displayName,
       }),
     startRoom: () => socket.emit('room:start'),

@@ -9,6 +9,10 @@ interface Session {
   playerId: string
 }
 
+interface ResumePayload extends Session {
+  sessionToken: string
+}
+
 type UnknownRecord = Record<string, unknown>
 
 function requireRecord(payload: unknown): UnknownRecord {
@@ -17,42 +21,47 @@ function requireRecord(payload: unknown): UnknownRecord {
   return payload as UnknownRecord
 }
 
-function requireString(payload: UnknownRecord, key: string): string {
+function requireString(
+  payload: UnknownRecord,
+  key: string,
+  maxLength = 256,
+): string {
   const value = payload[key]
-  if (typeof value !== 'string' || !value.trim())
+  if (
+    typeof value !== 'string' ||
+    !value.trim() ||
+    value.length > maxLength
+  )
     throw new Error(`Invalid ${key}.`)
   return value
 }
 
 export function parseRoomCreatePayload(payload: unknown): {
   displayName: string
-  playerId: string
 } {
   const record = requireRecord(payload)
   return {
     displayName: requireString(record, 'displayName'),
-    playerId: requireString(record, 'playerId'),
   }
 }
 
 export function parseRoomJoinPayload(payload: unknown): {
   roomId: string
-  playerId: string
   displayName: string
 } {
   const record = requireRecord(payload)
   return {
     roomId: requireString(record, 'roomId'),
-    playerId: requireString(record, 'playerId'),
     displayName: requireString(record, 'displayName'),
   }
 }
 
-export function parseSessionPayload(payload: unknown): Session {
+export function parseSessionPayload(payload: unknown): ResumePayload {
   const record = requireRecord(payload)
   return {
     roomId: requireString(record, 'roomId'),
     playerId: requireString(record, 'playerId'),
+    sessionToken: requireString(record, 'sessionToken', 512),
   }
 }
 
@@ -159,19 +168,12 @@ export function registerSocketHandlers(io: Server, rooms: RoomService): void {
   io.on('connection', (socket) => {
     socket.on('room:create', (payload: unknown) => {
         try {
-          const { displayName, playerId } = parseRoomCreatePayload(payload)
-          const { room, player } = rooms.createRoom(
-            displayName,
-            playerId,
-            socket.id,
-          )
+          const { displayName } = parseRoomCreatePayload(payload)
+          const { room, player, session } = rooms.createRoom(displayName, socket.id)
           sessions.set(socket.id, { roomId: room.id, playerId: player.id })
           socket.join(room.id)
+          socket.emit('session:restored', session)
           socket.emit('room:state', roomState(room))
-          socket.emit('session:restored', {
-            roomId: room.id,
-            playerId: player.id,
-          })
         } catch (error) {
           fail(socket, error)
         }
@@ -179,11 +181,15 @@ export function registerSocketHandlers(io: Server, rooms: RoomService): void {
 
     socket.on('room:join', (payload: unknown) => {
         try {
-          const { roomId, playerId, displayName } = parseRoomJoinPayload(payload)
-          const room = rooms.joinRoom(roomId, playerId, displayName, socket.id)
-          sessions.set(socket.id, { roomId, playerId })
+          const { roomId, displayName } = parseRoomJoinPayload(payload)
+          const { room, player, session } = rooms.joinRoom(
+            roomId,
+            displayName,
+            socket.id,
+          )
+          sessions.set(socket.id, { roomId, playerId: player.id })
           socket.join(roomId)
-          socket.emit('session:restored', { roomId, playerId })
+          socket.emit('session:restored', session)
           broadcastRoom(room)
         } catch (error) {
           fail(socket, error)
@@ -192,15 +198,21 @@ export function registerSocketHandlers(io: Server, rooms: RoomService): void {
 
     socket.on('session:resume', (payload: unknown) => {
       try {
-        const { roomId, playerId } = parseSessionPayload(payload)
-        const room = rooms.resumeSession(roomId, playerId, socket.id)
+        const { roomId, playerId, sessionToken } = parseSessionPayload(payload)
+        const room = rooms.resumeSession(
+          roomId,
+          playerId,
+          sessionToken,
+          socket.id,
+        )
         sessions.set(socket.id, { roomId, playerId })
         socket.join(roomId)
-        socket.emit('session:restored', { roomId, playerId })
+        socket.emit('session:restored', { roomId, playerId, sessionToken })
         broadcastRoom(room)
         broadcastGame(room)
-      } catch (error) {
-        fail(socket, error)
+      } catch {
+        // Do not reveal whether a room, player, or credential was invalid.
+        socket.emit('game:error', 'Unable to restore session.')
       }
     })
 

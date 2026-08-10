@@ -16,6 +16,8 @@ export interface Room {
   status: 'lobby' | 'playing' | 'finished'
   pendingDecision?: PendingDecision
   gameLog: string[]
+  /** SHA-256 hashes only. Raw bearer tokens never enter the room state. */
+  sessionTokenHashes: Record<string, string>
 }
 
 export interface PendingDecision {

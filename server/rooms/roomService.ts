@@ -16,6 +16,17 @@ import type { PendingDecision } from './types'
 import { deserializeRoom, serializeRoom } from '../persistence/serializer'
 import { InMemoryRoomRepository } from '../persistence/inMemoryRoomRepository'
 import type { RoomRepository } from '../persistence/types'
+import {
+  createSessionToken,
+  hashSessionToken,
+  matchesSessionToken,
+} from '../security/sessionToken'
+
+export interface SessionCredential {
+  roomId: string
+  playerId: string
+  sessionToken: string
+}
 
 export class RoomService {
   private readonly rooms = new Map<string, Room>()
@@ -28,48 +39,52 @@ export class RoomService {
 
   createRoom(
     displayName: string,
-    playerId = this.createPlayerId(),
     socketId?: string,
-  ): { room: Room; player: RoomPlayer } {
-    const player = this.createPlayer(displayName, playerId, socketId)
+  ): { room: Room; player: RoomPlayer; session: SessionCredential } {
+    const player = this.createPlayer(displayName, socketId)
+    const sessionToken = createSessionToken()
     const room: Room = {
       id: this.createRoomCode(),
       hostPlayerId: player.id,
       players: [player],
       status: 'lobby',
       gameLog: [],
+      sessionTokenHashes: { [player.id]: hashSessionToken(sessionToken) },
     }
     this.rooms.set(room.id, room)
     this.persistRoom(room)
-    return { room, player }
+    return {
+      room,
+      player,
+      session: { roomId: room.id, playerId: player.id, sessionToken },
+    }
   }
 
   joinRoom(
     roomId: string,
-    playerId: string,
     displayName: string,
     socketId?: string,
-  ): Room {
+  ): { room: Room; player: RoomPlayer; session: SessionCredential } {
     const room = this.requireRoom(roomId)
     if (room.status !== 'lobby')
       throw new Error('Cannot join a room after the game has started.')
     this.validateDisplayName(displayName)
     if (room.players.length >= 8) throw new Error('This room is full.')
-    if (room.players.some((player) => player.id === playerId))
-      throw new Error('This player is already in the room.')
     if (
       room.players.some((player) => player.displayName === displayName.trim())
     )
       throw new Error('Display names must be unique in a room.')
 
-    room.players.push({
-      id: playerId,
-      displayName: displayName.trim(),
-      connected: true,
-      socketId,
-    })
+    const player = this.createPlayer(displayName, socketId)
+    const sessionToken = createSessionToken()
+    room.players.push(player)
+    room.sessionTokenHashes[player.id] = hashSessionToken(sessionToken)
     this.persistRoom(room)
-    return room
+    return {
+      room,
+      player,
+      session: { roomId, playerId: player.id, sessionToken },
+    }
   }
 
   leaveRoom(roomId: string, playerId: string): Room | undefined {
@@ -86,8 +101,10 @@ export class RoomService {
       return undefined
     }
     room.players = remainingPlayers
+    delete room.sessionTokenHashes[playerId]
     if (room.hostPlayerId === playerId)
       room.hostPlayerId = remainingPlayers[0].id
+    this.persistRoom(room)
     return room
   }
 
@@ -207,10 +224,17 @@ export class RoomService {
     return this.rooms.get(roomId)
   }
 
-  resumeSession(roomId: string, playerId: string, socketId: string): Room {
+  resumeSession(
+    roomId: string,
+    playerId: string,
+    sessionToken: string,
+    socketId: string,
+  ): Room {
     const room = this.requireRoom(roomId)
     const player = room.players.find((candidate) => candidate.id === playerId)
-    if (!player) throw new Error('Player is not in this room.')
+    const tokenHash = room.sessionTokenHashes[playerId]
+    if (!player || !tokenHash || !matchesSessionToken(sessionToken, tokenHash))
+      throw new Error('Unable to restore session.')
     player.connected = true
     player.socketId = socketId
     this.persistRoom(room)
@@ -231,10 +255,14 @@ export class RoomService {
   async restoreFromRepository(): Promise<void> {
     const snapshots = await this.repository.loadActive()
     for (const snapshot of snapshots) {
-      const room = deserializeRoom(snapshot)
-      if (this.rooms.has(room.id))
-        throw new Error(`Duplicate persisted room code: ${room.id}`)
-      this.rooms.set(room.id, room)
+      try {
+        const room = deserializeRoom(snapshot)
+        if (this.rooms.has(room.id))
+          throw new Error(`Duplicate persisted room code: ${room.id}`)
+        this.rooms.set(room.id, room)
+      } catch {
+        this.logError('Skipped an unsupported persisted room snapshot.')
+      }
     }
   }
 
@@ -251,12 +279,11 @@ export class RoomService {
 
   private createPlayer(
     displayName: string,
-    playerId: string,
     socketId?: string,
   ): RoomPlayer {
     this.validateDisplayName(displayName)
     return {
-      id: playerId,
+      id: this.createPlayerId(),
       displayName: displayName.trim(),
       connected: true,
       socketId,
@@ -276,7 +303,7 @@ export class RoomService {
   }
 
   private createPlayerId(): string {
-    return `player-${Math.random().toString(36).slice(2, 12)}`
+    return `player-${randomUUID()}`
   }
 
   private createRoomCode(): string {

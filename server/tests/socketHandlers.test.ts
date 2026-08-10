@@ -53,15 +53,23 @@ describe('socket command boundary', () => {
     client.emit('room:create', null)
     await expect(malformedError).resolves.toContain('Invalid request payload')
 
-    const restored = once<{ roomId: string; playerId: string }>(
+    const restored = once<{
+      roomId: string
+      playerId: string
+      sessionToken: string
+    }>(
       client,
       'session:restored',
     )
-    client.emit('room:create', { displayName: 'Ada', playerId: 'ada-id' })
-    await expect(restored).resolves.toEqual({
+    const roomState = once<unknown>(client, 'room:state')
+    client.emit('room:create', { displayName: 'Ada' })
+    const session = await restored
+    expect(session).toEqual({
       roomId: expect.stringMatching(/^[A-Z0-9]{6}$/),
-      playerId: 'ada-id',
+      playerId: expect.stringMatching(/^player-/),
+      sessionToken: expect.any(String),
     })
+    expect(JSON.stringify(await roomState)).not.toContain(session.sessionToken)
   })
 
   it('rejects a replaced socket and ignores its later disconnect', async () => {
@@ -74,15 +82,23 @@ describe('socket command boundary', () => {
       server.httpServer.listen(0, '127.0.0.1', resolve),
     )
     const original = await connect(server)
-    const created = once<{ roomId: string; playerId: string }>(
+    const created = once<{
+      roomId: string
+      playerId: string
+      sessionToken: string
+    }>(
       original,
       'session:restored',
     )
-    original.emit('room:create', { displayName: 'Ada', playerId: 'ada-id' })
+    original.emit('room:create', { displayName: 'Ada' })
     const session = await created
 
     const replacement = await connect(server)
-    const resumed = once<{ roomId: string; playerId: string }>(
+    const resumed = once<{
+      roomId: string
+      playerId: string
+      sessionToken: string
+    }>(
       replacement,
       'session:restored',
     )
@@ -95,8 +111,39 @@ describe('socket command boundary', () => {
 
     original.disconnect()
     await waitForTick()
-    expect(server.rooms.isActiveSocket(session.roomId, 'ada-id', replacement.id)).toBe(
-      true,
+    expect(
+      server.rooms.isActiveSocket(
+        session.roomId,
+        session.playerId,
+        replacement.id,
+      ),
+    ).toBe(true)
+  })
+
+  it('does not let an invalid resume credential evict the active player', async () => {
+    const server = createGameServer({
+      port: 0,
+      clientOrigins: ['http://localhost:5173'],
+    })
+    servers.push(server)
+    await new Promise<void>((resolve) =>
+      server.httpServer.listen(0, '127.0.0.1', resolve),
     )
+    const legitimate = await connect(server)
+    const created = once<{
+      roomId: string
+      playerId: string
+      sessionToken: string
+    }>(legitimate, 'session:restored')
+    legitimate.emit('room:create', { displayName: 'Ada' })
+    const session = await created
+
+    const attacker = await connect(server)
+    const denied = once<string>(attacker, 'game:error')
+    attacker.emit('session:resume', { ...session, sessionToken: 'wrong-token' })
+    await expect(denied).resolves.toBe('Unable to restore session.')
+    expect(
+      server.rooms.isActiveSocket(session.roomId, session.playerId, legitimate.id),
+    ).toBe(true)
   })
 })

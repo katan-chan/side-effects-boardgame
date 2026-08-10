@@ -28,7 +28,7 @@ describe('socket payload validation', () => {
   it('rejects malformed room, session, command, and decision payloads safely', () => {
     expect(() => parseRoomCreatePayload(null)).toThrow('Invalid request payload')
     expect(() => parseRoomJoinPayload({ roomId: 'ROOM' })).toThrow(
-      'Invalid playerId',
+      'Invalid displayName',
     )
     expect(() => parseSessionPayload({ roomId: '', playerId: 'ada-id' })).toThrow(
       'Invalid roomId',
@@ -56,6 +56,23 @@ describe('socket payload validation', () => {
     ).toEqual({
       decisionId: 'decision-1',
       choiceIds: ['choice-1', 'choice-2', 'choice-3'],
+    })
+  })
+
+  it('requires a bounded bearer credential to resume a session', () => {
+    expect(() =>
+      parseSessionPayload({ roomId: 'ROOM01', playerId: 'ada-id' }),
+    ).toThrow('Invalid sessionToken')
+    expect(
+      parseSessionPayload({
+        roomId: 'ROOM01',
+        playerId: 'ada-id',
+        sessionToken: 'credential-value',
+      }),
+    ).toEqual({
+      roomId: 'ROOM01',
+      playerId: 'ada-id',
+      sessionToken: 'credential-value',
     })
   })
 })

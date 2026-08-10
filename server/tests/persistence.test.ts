@@ -7,21 +7,21 @@ import { RoomService } from '../rooms/roomService'
 
 function startedService(repository = new InMemoryRoomRepository()) {
   const service = new RoomService(repository, () => undefined)
-  const { room, player: host } = service.createRoom('Ada', 'ada-id')
-  service.joinRoom(room.id, 'ben-id', 'Ben')
+  const { room, player: host, session: hostSession } = service.createRoom('Ada')
+  const { player: ben, session: benSession } = service.joinRoom(room.id, 'Ben')
   service.startRoom(room.id, host.id)
-  return { service, repository, room, host }
+  return { service, repository, room, host, ben, hostSession, benSession }
 }
 
 describe('room persistence', () => {
   it('persists create, join, start, and only valid commands', async () => {
     const repository = new InMemoryRoomRepository()
     const service = new RoomService(repository, () => undefined)
-    const { room, player: host } = service.createRoom('Ada', 'ada-id')
+    const { room, player: host } = service.createRoom('Ada')
     await service.flushPersistence(room.id)
     expect(repository.saveCount).toBe(1)
 
-    service.joinRoom(room.id, 'ben-id', 'Ben')
+    service.joinRoom(room.id, 'Ben')
     await service.flushPersistence(room.id)
     expect(repository.saveCount).toBe(2)
     service.startRoom(room.id, host.id)
@@ -45,12 +45,17 @@ describe('room persistence', () => {
 
   it('round-trips and restores active rooms with disconnected players', async () => {
     const repository = new InMemoryRoomRepository()
-    const { service, room } = startedService(repository)
+    const { service, room, host, ben, hostSession, benSession } =
+      startedService(repository)
     await service.flushPersistence(room.id)
     const beforeRestart = service.getRoom(room.id)!
     const snapshot = serializeRoom(beforeRestart)
 
     expect(deserializeRoom(snapshot).gameState).toEqual(beforeRestart.gameState)
+    expect(JSON.stringify(snapshot)).not.toContain(hostSession.sessionToken)
+    expect(snapshot.room.sessionTokenHashes[host.id]).toEqual(
+      expect.any(String),
+    )
     const restoredService = new RoomService(repository, () => undefined)
     await restoredService.restoreFromRepository()
     const restored = restoredService.getRoom(room.id)!
@@ -59,10 +64,20 @@ describe('room persistence', () => {
     expect(restored.players.every((player) => !player.socketId)).toBe(true)
     expect(hasCardConservation(restored.gameState!)).toBe(true)
 
-    restoredService.resumeSession(room.id, 'ada-id', 'new-ada-socket')
-    restoredService.resumeSession(room.id, 'ben-id', 'new-ben-socket')
+    restoredService.resumeSession(
+      room.id,
+      host.id,
+      hostSession.sessionToken,
+      'new-ada-socket',
+    )
+    restoredService.resumeSession(
+      room.id,
+      ben.id,
+      benSession.sessionToken,
+      'new-ben-socket',
+    )
     expect(restoredService.getRoom(room.id)!.players[0]).toMatchObject({
-      id: 'ada-id',
+      id: host.id,
       connected: true,
       socketId: 'new-ada-socket',
     })
@@ -77,7 +92,7 @@ describe('room persistence', () => {
   it('preserves pending Anxiety and Tremors decisions across restart', async () => {
     for (const kind of ['anxiety', 'tremors'] as const) {
       const repository = new InMemoryRoomRepository()
-      const { service, room } = startedService(repository)
+      const { service, room, hostSession, benSession } = startedService(repository)
       const current = room.gameState!.players[room.gameState!.currentPlayerIndex]
       const target = room.gameState!.players.find(
         (player) => player.id !== current.id,
@@ -103,7 +118,14 @@ describe('room persistence', () => {
               ),
       }
       // Resume triggers a persistence mutation without exposing socket IDs.
-      service.resumeSession(room.id, current.id, 'temporary-socket')
+      service.resumeSession(
+        room.id,
+        current.id,
+        current.id === hostSession.playerId
+          ? hostSession.sessionToken
+          : benSession.sessionToken,
+        'temporary-socket',
+      )
       await service.flushPersistence(room.id)
 
       const restoredService = new RoomService(repository, () => undefined)
@@ -128,8 +150,8 @@ describe('room persistence', () => {
     }
     const repository = new DelayedRepository()
     const service = new RoomService(repository, () => undefined)
-    const { room } = service.createRoom('Ada', 'ada-id')
-    service.joinRoom(room.id, 'ben-id', 'Ben')
+    const { room } = service.createRoom('Ada')
+    service.joinRoom(room.id, 'Ben')
     await service.flushPersistence(room.id)
 
     expect(repository.saved).toHaveLength(2)
@@ -155,7 +177,7 @@ describe('room persistence', () => {
     const repository = new FlakyRepository()
     const logError = vi.fn()
     const service = new RoomService(repository, logError)
-    const { room } = service.createRoom('Ada', 'ada-id')
+    const { room } = service.createRoom('Ada')
     await service.flushPersistence(room.id)
 
     expect(service.getRoom(room.id)?.players).toHaveLength(1)
@@ -163,10 +185,38 @@ describe('room persistence', () => {
       'Room persistence failed; the in-memory game remains active.',
     )
 
-    service.joinRoom(room.id, 'ben-id', 'Ben')
+    service.joinRoom(room.id, 'Ben')
     await service.flushPersistence(room.id)
 
     expect(repository.saved).toHaveLength(1)
     expect(repository.saved[0].room.players).toHaveLength(2)
+  })
+
+  it('skips legacy snapshots rather than restoring playerId-only sessions', async () => {
+    const repository: RoomRepository = {
+      save: async () => undefined,
+      loadActive: async () =>
+        [
+          {
+            schemaVersion: 1,
+            room: {
+              id: 'LEGACY',
+              hostPlayerId: 'legacy-player',
+              players: [],
+              status: 'lobby',
+              gameLog: [],
+            },
+          },
+        ] as unknown as PersistedRoomSnapshot[],
+    }
+    const logError = vi.fn()
+    const service = new RoomService(repository, logError)
+
+    await service.restoreFromRepository()
+
+    expect(service.getRoom('LEGACY')).toBeUndefined()
+    expect(logError).toHaveBeenCalledWith(
+      'Skipped an unsupported persisted room snapshot.',
+    )
   })
 })

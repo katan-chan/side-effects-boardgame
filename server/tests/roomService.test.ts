@@ -4,23 +4,34 @@ import { RoomService } from '../rooms/roomService'
 
 function startedRoom() {
   const service = new RoomService()
-  const { room, player: host } = service.createRoom('Ada')
-  service.joinRoom(room.id, 'ben-id', 'Ben')
-  return { service, room: service.startRoom(room.id, host.id), host }
+  const { room, player: host, session: hostSession } = service.createRoom('Ada')
+  const { player: ben, session: benSession } = service.joinRoom(room.id, 'Ben')
+  return {
+    service,
+    room: service.startRoom(room.id, host.id),
+    host,
+    ben,
+    hostSession,
+    benSession,
+  }
 }
 
 describe('authoritative rooms', () => {
   it('creates a room and joins distinct players', () => {
     const service = new RoomService()
-    const { room, player } = service.createRoom('Ada')
-    const joined = service.joinRoom(room.id, 'ben-id', 'Ben')
+    const { room, player, session: hostSession } = service.createRoom('Ada')
+    const joined = service.joinRoom(room.id, 'Ben')
 
-    expect(joined.hostPlayerId).toBe(player.id)
-    expect(joined.players.map((candidate) => candidate.displayName)).toEqual([
+    expect(joined.room.hostPlayerId).toBe(player.id)
+    expect(joined.room.players.map((candidate) => candidate.displayName)).toEqual([
       'Ada',
       'Ben',
     ])
     expect(room.id).toMatch(/^[A-Z0-9]{6}$/)
+    expect(hostSession.sessionToken).toMatch(/^[A-Za-z0-9_-]{43}$/)
+    expect(joined.session.sessionToken).toMatch(/^[A-Za-z0-9_-]{43}$/)
+    expect(joined.session.sessionToken).not.toBe(hostSession.sessionToken)
+    expect(JSON.stringify(room)).not.toContain(hostSession.sessionToken)
   })
 
   it('assigns unique short room codes', () => {
@@ -35,78 +46,151 @@ describe('authoritative rooms', () => {
     const service = new RoomService()
     const { room } = service.createRoom('Ada')
 
-    expect(() => service.joinRoom(room.id, 'ben-id', '')).toThrow(
+    expect(() => service.joinRoom(room.id, '')).toThrow(
       'Display name',
     )
-    service.joinRoom(room.id, 'ben-id', 'Ben')
-    expect(() => service.joinRoom(room.id, 'ben-id', 'Bea')).toThrow('already')
-    expect(() => service.joinRoom(room.id, 'bea-id', 'Ben')).toThrow('unique')
-    expect(() => service.joinRoom('MISSING', 'cam-id', 'Cam')).toThrow(
+    service.joinRoom(room.id, 'Ben')
+    expect(() => service.joinRoom(room.id, 'Ben')).toThrow('unique')
+    expect(() => service.joinRoom('MISSING', 'Cam')).toThrow(
       'Room not found',
     )
   })
 
   it('keeps disconnected players in their slot and restores the same player on resume', () => {
-    const { service, room, host } = startedRoom()
-    const afterDisconnect = service.markDisconnected(room.id, 'ben-id')
+    const { service, room, host, ben, benSession } = startedRoom()
+    const afterDisconnect = service.markDisconnected(room.id, ben.id)
 
     expect(afterDisconnect.players).toHaveLength(2)
     expect(
-      afterDisconnect.players.find((player) => player.id === 'ben-id')
+      afterDisconnect.players.find((player) => player.id === ben.id)
         ?.connected,
     ).toBe(false)
     expect(() =>
-      service.executeCommand(room.id, 'ben-id', { type: 'draw' }),
+      service.executeCommand(room.id, ben.id, { type: 'draw' }),
     ).toThrow('Disconnected')
 
-    const restored = service.resumeSession(room.id, 'ben-id', 'new-socket')
+    const restored = service.resumeSession(
+      room.id,
+      ben.id,
+      benSession.sessionToken,
+      'new-socket',
+    )
     expect(restored.players).toHaveLength(2)
     expect(
-      restored.players.find((player) => player.id === 'ben-id'),
+      restored.players.find((player) => player.id === ben.id),
     ).toMatchObject({ connected: true, socketId: 'new-socket' })
     expect(restored.gameState).toBe(room.gameState)
     expect(restored.hostPlayerId).toBe(host.id)
   })
 
   it('ignores a stale socket disconnect after the player has reconnected', () => {
-    const { service, room } = startedRoom()
-    service.resumeSession(room.id, 'ben-id', 'replacement-socket')
+    const { service, room, ben, benSession } = startedRoom()
+    service.resumeSession(
+      room.id,
+      ben.id,
+      benSession.sessionToken,
+      'replacement-socket',
+    )
 
     const afterStaleDisconnect = service.markDisconnected(
       room.id,
-      'ben-id',
+      ben.id,
       'old-socket',
     )
 
     expect(
-      afterStaleDisconnect.players.find((player) => player.id === 'ben-id'),
+      afterStaleDisconnect.players.find((player) => player.id === ben.id),
     ).toMatchObject({ connected: true, socketId: 'replacement-socket' })
     expect(
-      service.isActiveSocket(room.id, 'ben-id', 'replacement-socket'),
+      service.isActiveSocket(room.id, ben.id, 'replacement-socket'),
     ).toBe(true)
-    expect(service.isActiveSocket(room.id, 'ben-id', 'old-socket')).toBe(false)
+    expect(service.isActiveSocket(room.id, ben.id, 'old-socket')).toBe(false)
+  })
+
+  it('requires the matching bearer token without evicting a legitimate socket', () => {
+    const { service, room, host, ben, hostSession, benSession } = startedRoom()
+    service.resumeSession(
+      room.id,
+      host.id,
+      hostSession.sessionToken,
+      'legitimate-socket',
+    )
+    const beforeAttempt = structuredClone(room.players)
+
+    expect(() =>
+      service.resumeSession(
+        room.id,
+        host.id,
+        'wrong-token',
+        'attacker-socket',
+      ),
+    ).toThrow('Unable to restore session')
+    expect(room.players).toEqual(beforeAttempt)
+    expect(service.isActiveSocket(room.id, host.id, 'legitimate-socket')).toBe(
+      true,
+    )
+
+    expect(() =>
+      service.resumeSession(
+        room.id,
+        host.id,
+        benSession.sessionToken,
+        'attacker-socket',
+      ),
+    ).toThrow('Unable to restore session')
+    expect(room.players).toEqual(beforeAttempt)
+
+    service.resumeSession(
+      room.id,
+      host.id,
+      hostSession.sessionToken,
+      'replacement-socket',
+    )
+    expect(service.isActiveSocket(room.id, host.id, 'replacement-socket')).toBe(
+      true,
+    )
+    expect(service.isActiveSocket(room.id, host.id, 'old-socket')).toBe(false)
+    expect(ben.id).not.toBe(host.id)
+  })
+
+  it('does not confuse credentials across rooms', () => {
+    const service = new RoomService()
+    const first = service.createRoom('Ada')
+    const second = service.createRoom('Ben')
+
+    expect(() =>
+      service.resumeSession(
+        first.room.id,
+        second.player.id,
+        second.session.sessionToken,
+        'cross-room-socket',
+      ),
+    ).toThrow('Unable to restore session')
+    expect(
+      service.isActiveSocket(first.room.id, first.player.id, 'cross-room-socket'),
+    ).toBe(false)
   })
 
   it('allows only the host to start a valid player-count room', () => {
     const service = new RoomService()
     const { room, player: host } = service.createRoom('Ada')
     expect(() => service.startRoom(room.id, host.id)).toThrow('At least two')
-    service.joinRoom(room.id, 'ben-id', 'Ben')
-    expect(() => service.startRoom(room.id, 'ben-id')).toThrow('Only the host')
+    const { player: ben } = service.joinRoom(room.id, 'Ben')
+    expect(() => service.startRoom(room.id, ben.id)).toThrow('Only the host')
 
     const started = service.startRoom(room.id, host.id)
     expect(started.status).toBe('playing')
     expect(started.gameState?.players.map((player) => player.id)).toEqual([
       host.id,
-      'ben-id',
+      ben.id,
     ])
   })
 
   it('does not allow the host to start while a lobby player is disconnected', () => {
     const service = new RoomService()
     const { room, player: host } = service.createRoom('Ada')
-    service.joinRoom(room.id, 'ben-id', 'Ben')
-    service.markDisconnected(room.id, 'ben-id')
+    const { player: ben } = service.joinRoom(room.id, 'Ben')
+    service.markDisconnected(room.id, ben.id)
 
     expect(() => service.startRoom(room.id, host.id)).toThrow(
       'All players must be connected',
@@ -149,7 +233,7 @@ describe('authoritative rooms', () => {
   })
 
   it('waits for a disconnected current player without allowing another player to act', () => {
-    const { service, room } = startedRoom()
+    const { service, room, hostSession, benSession } = startedRoom()
     const currentPlayerId = room.gameState!.currentPlayerId
     const otherPlayerId = room.gameState!.players.find(
       (player) => player.id !== currentPlayerId,
@@ -162,7 +246,14 @@ describe('authoritative rooms', () => {
     ).toThrow('current player')
     expect(room.gameState).toEqual(beforeAttempt)
 
-    service.resumeSession(room.id, currentPlayerId, 'returning-socket')
+    service.resumeSession(
+      room.id,
+      currentPlayerId,
+      hostSession.playerId === currentPlayerId
+        ? hostSession.sessionToken
+        : benSession.sessionToken,
+      'returning-socket',
+    )
     expect(
       service.executeCommand(room.id, currentPlayerId, { type: 'draw' }).turn
         .phase,
@@ -170,7 +261,7 @@ describe('authoritative rooms', () => {
   })
 
   it('projects private hands differently for each viewer while sharing public state', () => {
-    const { service, room } = startedRoom()
+    const { service, room, benSession } = startedRoom()
     const game = room.gameState!
     const firstPlayer = game.players[0]
     const secondPlayer = game.players[1]
@@ -198,6 +289,7 @@ describe('authoritative rooms', () => {
     const reconnectedRoom = service.resumeSession(
       room.id,
       secondPlayer.id,
+      benSession.sessionToken,
       'second-new-socket',
     )
     const afterReconnectView = createPlayerView(

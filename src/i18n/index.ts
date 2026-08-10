@@ -18,6 +18,7 @@ export function cardName(definitionId: string, fallback: string): string {
 }
 export function localizeError(message: string): string {
   const pairs: Array<[string, string]> = [
+    ['Unable to restore session', 'Phiên chơi không còn hợp lệ. Hãy tham gia lại phòng.'],
     ['current player', 'Không phải lượt của bạn.'], ['draw phase', 'Hãy rút bài trước.'], ['play phase', 'Chưa đến giai đoạn chơi bài.'], ['two cards', 'Bạn đã chơi đủ 2 lá trong lượt này.'], ['does not treat', 'Thuốc này không điều trị Rối loạn đã chọn.'], ['side effect', 'Người chơi này không chịu Tác dụng phụ tương ứng.'], ['already has', 'Người chơi đã có Rối loạn này.'], ['Tremors', 'Không thể dùng Trị liệu lên Run rẩy.'], ['already treated', 'Rối loạn này đã được điều trị.'], ['Room not found', 'Phòng không tồn tại.'], ['Only the host', 'Chỉ Chủ phòng mới có thể bắt đầu ván.'], ['Unable to connect', 'Không thể kết nối tới máy chủ.'],
   ]
   return (

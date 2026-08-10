@@ -19,7 +19,12 @@ export function deserializeRoom(snapshot: PersistedRoomSnapshot): Room {
   if (snapshot.schemaVersion !== ROOM_SNAPSHOT_SCHEMA_VERSION)
     throw new Error(`Unsupported room snapshot schema: ${snapshot.schemaVersion}`)
   const room = snapshot.room
-  if (!room.id || !room.hostPlayerId || !Array.isArray(room.players))
+  if (
+    !room.id ||
+    !room.hostPlayerId ||
+    !Array.isArray(room.players) ||
+    !room.sessionTokenHashes
+  )
     throw new Error('Invalid room snapshot.')
   return {
     ...room,
