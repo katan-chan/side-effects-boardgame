@@ -1,6 +1,8 @@
 import { createServer } from 'node:http'
 import { Server } from 'socket.io'
 import type { ServerConfig } from './config'
+import { InMemoryRoomRepository } from './persistence/inMemoryRoomRepository'
+import { SupabaseRoomRepository } from './persistence/supabaseRoomRepository'
 import { RoomService } from './rooms/roomService'
 import { registerSocketHandlers } from './socket/registerSocketHandlers'
 
@@ -20,6 +22,15 @@ export function createGameServer(config: ServerConfig) {
       methods: ['GET', 'POST'],
     },
   })
-  registerSocketHandlers(io, new RoomService())
-  return { httpServer, io }
+  const repository = config.supabase
+    ? new SupabaseRoomRepository(config.supabase)
+    : new InMemoryRoomRepository()
+  const rooms = new RoomService(repository)
+  registerSocketHandlers(io, rooms)
+  return {
+    httpServer,
+    io,
+    rooms,
+    restore: () => rooms.restoreFromRepository(),
+  }
 }

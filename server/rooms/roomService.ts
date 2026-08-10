@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { playDisorder } from '../../src/game/engine/disorderPlay'
 import { playDrug } from '../../src/game/engine/drugTreatment'
 import { playEpisode } from '../../src/game/engine/episode'
@@ -12,9 +13,18 @@ import type { GameState } from '../../src/game/engine/types'
 import type { GameCommand } from '../game/commands'
 import type { Room, RoomPlayer } from './types'
 import type { PendingDecision } from './types'
+import { deserializeRoom, serializeRoom } from '../persistence/serializer'
+import { InMemoryRoomRepository } from '../persistence/inMemoryRoomRepository'
+import type { RoomRepository } from '../persistence/types'
 
 export class RoomService {
   private readonly rooms = new Map<string, Room>()
+  private readonly persistenceQueues = new Map<string, Promise<void>>()
+
+  constructor(
+    private readonly repository: RoomRepository = new InMemoryRoomRepository(),
+    private readonly logError: (message: string) => void = console.error,
+  ) {}
 
   createRoom(
     displayName: string,
@@ -30,6 +40,7 @@ export class RoomService {
       gameLog: [],
     }
     this.rooms.set(room.id, room)
+    this.persistRoom(room)
     return { room, player }
   }
 
@@ -57,6 +68,7 @@ export class RoomService {
       connected: true,
       socketId,
     })
+    this.persistRoom(room)
     return room
   }
 
@@ -96,6 +108,7 @@ export class RoomService {
     )
     room.status = 'playing'
     room.gameLog.push('Game started.')
+    this.persistRoom(room)
     return room
   }
 
@@ -127,6 +140,7 @@ export class RoomService {
       )
       if (requirement) {
         room.pendingDecision = this.createPendingDecision(command, requirement)
+        this.persistRoom(room)
         return game
       }
     }
@@ -136,6 +150,7 @@ export class RoomService {
       -30,
     )
     if (nextGame.status === 'finished') room.status = 'finished'
+    this.persistRoom(room)
     return nextGame
   }
 
@@ -184,6 +199,7 @@ export class RoomService {
       this.publicLogEntry(room.gameState, decision.command),
     ].slice(-30)
     if (nextGame.status === 'finished') room.status = 'finished'
+    this.persistRoom(room)
     return nextGame
   }
 
@@ -197,6 +213,7 @@ export class RoomService {
     if (!player) throw new Error('Player is not in this room.')
     player.connected = true
     player.socketId = socketId
+    this.persistRoom(room)
     return room
   }
 
@@ -207,7 +224,22 @@ export class RoomService {
     if (socketId && player.socketId !== socketId) return room
     player.connected = false
     player.socketId = undefined
+    this.persistRoom(room)
     return room
+  }
+
+  async restoreFromRepository(): Promise<void> {
+    const snapshots = await this.repository.loadActive()
+    for (const snapshot of snapshots) {
+      const room = deserializeRoom(snapshot)
+      if (this.rooms.has(room.id))
+        throw new Error(`Duplicate persisted room code: ${room.id}`)
+      this.rooms.set(room.id, room)
+    }
+  }
+
+  flushPersistence(roomId: string): Promise<void> {
+    return this.persistenceQueues.get(roomId) ?? Promise.resolve()
   }
 
   isActiveSocket(roomId: string, playerId: string, socketId: string): boolean {
@@ -229,6 +261,18 @@ export class RoomService {
       connected: true,
       socketId,
     }
+  }
+
+  private persistRoom(room: Room): void {
+    const snapshot = serializeRoom(room)
+    const previous = this.persistenceQueues.get(room.id) ?? Promise.resolve()
+    const queued = previous
+      .catch(() => undefined)
+      .then(() => this.repository.save(snapshot))
+      .catch(() => {
+        this.logError('Room persistence failed; the in-memory game remains active.')
+      })
+    this.persistenceQueues.set(room.id, queued)
   }
 
   private createPlayerId(): string {
@@ -337,4 +381,3 @@ export class RoomService {
     }
   }
 }
-import { randomUUID } from 'node:crypto'

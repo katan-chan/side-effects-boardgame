@@ -35,6 +35,19 @@ describe('production server configuration', () => {
       ],
     })
     expect(() => getServerConfig({ PORT: 'invalid' })).toThrow('PORT')
+    expect(() => getServerConfig({ NODE_ENV: 'production' })).toThrow(
+      'Production requires Supabase',
+    )
+    expect(
+      getServerConfig({
+        NODE_ENV: 'production',
+        SUPABASE_URL: 'https://example.supabase.co',
+        SUPABASE_SECRET_KEY: 'server-only-key',
+      }).supabase,
+    ).toEqual({
+      url: 'https://example.supabase.co',
+      secretKey: 'server-only-key',
+    })
   })
 
   it('serves a non-sensitive health response', async () => {

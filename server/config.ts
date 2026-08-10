@@ -1,6 +1,7 @@
 export interface ServerConfig {
   port: number
   clientOrigins: string[]
+  supabase?: { url: string; secretKey: string }
 }
 
 const developmentClientOrigin = 'http://localhost:5173'
@@ -17,5 +18,16 @@ export function getServerConfig(env: NodeJS.ProcessEnv = process.env): ServerCon
   if (clientOrigins.length === 0)
     throw new Error('CLIENT_ORIGIN must contain at least one origin.')
 
-  return { port, clientOrigins }
+  const url = env.SUPABASE_URL
+  const secretKey = env.SUPABASE_SECRET_KEY
+  if (Boolean(url) !== Boolean(secretKey))
+    throw new Error('SUPABASE_URL and SUPABASE_SECRET_KEY must be set together.')
+  if (env.NODE_ENV === 'production' && !url)
+    throw new Error('Production requires Supabase room persistence configuration.')
+
+  return {
+    port,
+    clientOrigins,
+    ...(url && secretKey ? { supabase: { url, secretKey } } : {}),
+  }
 }

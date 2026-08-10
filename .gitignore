@@ -143,6 +143,11 @@ vite.config.ts.timestamp-*
 .vite/
 
 # Project build output and local development state
+dist/
 dist-server/
 *.local
 .env.local
+
+# Supabase local CLI state (migrations stay tracked)
+supabase/.branches/
+supabase/.temp/
