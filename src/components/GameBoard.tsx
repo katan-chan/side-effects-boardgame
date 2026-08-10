@@ -7,7 +7,7 @@ import type {
   PublicCardView,
   PublicPsycheSlotView,
 } from '../../server/game/playerView'
-import { cardName, localizeError, phaseName, t } from '../i18n'
+import { cardName, disorderName, locale, localizeError, phaseName, t } from '../i18n'
 import { GameCard } from './cards/GameCard'
 import { CardBack } from './cards/CardBack'
 import { DisorderIcon } from './cards/DisorderIcon'
@@ -67,7 +67,7 @@ interface GameBoardProps {
   onPlayTherapy: (therapyId: string, disorderId: string) => void
 }
 
-function Psyche({
+export function Psyche({
   player,
   playerId,
   selectedId,
@@ -88,10 +88,6 @@ function Psyche({
         const drugDefinition = slot.drug
           ? getCardDefinition(slot.drug.definitionId)
           : undefined
-        const sideEffectCount =
-          drugDefinition?.cardType === 'drug'
-            ? drugDefinition.sideEffects.length
-            : 0
         return (
         <button
           type="button"
@@ -109,13 +105,25 @@ function Psyche({
           <span className={slot.drug ? 'treated' : 'untreated'}>
             {slot.drug ? t('treated') : t('untreated')}
           </span>
-          {slot.drug && <small>{cardName(slot.drug.definitionId, slot.drug.displayName)}</small>}
+          <small className="slot-label">{t('episodeEffect')}</small>
+          <span className="slot-effect">
+            {locale.episodeDescriptions[slot.disorder.definitionId as DisorderId]}
+          </span>
           {slot.drug && (
-            <small className="slot-summary">
-              {t('sideEffectCount', {
-                count: sideEffectCount,
-              })}
-            </small>
+            <section className="treatment-attachment">
+              <small>{t('treatedBy')}</small>
+              <strong>{cardName(slot.drug.definitionId, slot.drug.displayName)}</strong>
+              <small>{t('sideEffects')}</small>
+              {drugDefinition?.cardType === 'drug' && (
+                <div className="side-effect-list">
+                  {drugDefinition.sideEffects.map((effect) => (
+                    <span className="side-effect-chip" key={effect}>
+                      {disorderName(effect)}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </section>
           )}
         </button>
         )
