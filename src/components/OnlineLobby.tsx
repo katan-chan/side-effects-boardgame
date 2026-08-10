@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { GameBoard } from './GameBoard'
+import { DecisionModal } from './DecisionModal'
 import {
   createMultiplayerClient,
   multiplayerServerUrl,
@@ -8,7 +9,7 @@ import {
   type RoomView,
 } from '../multiplayer/multiplayerClient'
 import type { PlayerGameView } from '../../server/game/playerView'
-import { disorderName, localizeError, t } from '../i18n'
+import { localizeError, t } from '../i18n'
 
 interface OnlineLobbyProps {
   onBack: () => void
@@ -76,14 +77,11 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
           <p className="error">{t('reconnecting')}</p>
         )}
         {game.pendingDecision && (
-          <PendingDecision
+          <DecisionModal
             decision={game.pendingDecision}
-            viewerId={viewerId}
-            onResolve={(choiceIds) =>
-              clientRef.current?.resolveDecision(
-                game.pendingDecision!.id,
-                choiceIds,
-              )
+            viewerPlayerId={viewerId}
+            onResolve={(decisionId, choiceIds) =>
+              clientRef.current?.resolveDecision(decisionId, choiceIds)
             }
           />
         )}
@@ -229,65 +227,3 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
   )
 }
 
-function PendingDecision({
-  decision,
-  viewerId,
-  onResolve,
-}: {
-  decision: NonNullable<PlayerGameView['pendingDecision']>
-  viewerId: string
-  onResolve: (choices: string[]) => void
-}) {
-  const [selected, setSelected] = useState<string[]>([])
-  const isChooser = decision.chooserPlayerId === viewerId
-  if (!isChooser)
-    return (
-      <section className="panel pending-decision">
-        {t('waitingDecision', { effect: disorderName(decision.kind) })}
-      </section>
-    )
-  if (decision.kind === 'anxiety')
-    return (
-      <section className="panel pending-decision">
-        <h2>{t('anxietyChoice')}</h2>
-        {decision.choices?.map((choice) => (
-          <button
-            type="button"
-            key={choice.id}
-            onClick={() => onResolve([choice.id])}
-          >
-            {choice.label}
-          </button>
-        ))}
-      </section>
-    )
-  return (
-    <section className="panel pending-decision">
-      <h2>{t('tremorsChoice')}</h2>
-      {decision.choices?.map((choice) => (
-        <label className="check" key={choice.id}>
-          <input
-            type="checkbox"
-            checked={selected.includes(choice.id)}
-            onChange={() =>
-              setSelected((ids) =>
-                ids.includes(choice.id)
-                  ? ids.filter((id) => id !== choice.id)
-                  : [...ids, choice.id],
-              )
-            }
-          />
-          {choice.label}
-        </label>
-      ))}
-      <button
-        type="button"
-        className="primary"
-        disabled={selected.length !== 3}
-        onClick={() => onResolve(selected)}
-      >
-        {t('discardThree')}
-      </button>
-    </section>
-  )
-}

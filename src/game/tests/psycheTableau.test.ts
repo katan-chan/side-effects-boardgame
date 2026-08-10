@@ -11,7 +11,7 @@ describe('physical Psyche tableau cards', () => {
   it('renders an untreated Episode effect directly without inspect state', () => {
     const player = createGame(['Ada', 'Ben']).players[0]
     const html = renderToStaticMarkup(
-      createElement(Psyche, { player, playerId: player.id }),
+      createElement(Psyche, { player, playerId: player.id, viewerId: player.id, isTargetingMode: false, onTargetSlot: () => {} }),
     )
     expect(html).toContain('Cơn phát bệnh')
     expect(html).toContain('Chưa điều trị')
@@ -34,7 +34,7 @@ describe('physical Psyche tableau cards', () => {
       psyche: { slots: [{ ...slot, drug }] },
     }
     const html = renderToStaticMarkup(
-      createElement(Psyche, { player: treatedPlayer, playerId: player.id }),
+      createElement(Psyche, { player: treatedPlayer, playerId: player.id, viewerId: player.id, isTargetingMode: false, onTargetSlot: () => {} }),
     )
     expect(html).toContain('Đã điều trị')
     expect(html).toContain(drug.displayName)

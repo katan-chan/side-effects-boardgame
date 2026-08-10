@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import type { CardInstance, DisorderId } from '../game/cards/types'
+import { useEffect, useState } from 'react'
+import type { CardInstance } from '../game/cards/types'
 import type { GameState, PlayerState } from '../game/engine/types'
 import type {
   PlayerGameView,
@@ -7,11 +7,11 @@ import type {
   PublicCardView,
   PublicPsycheSlotView,
 } from '../../server/game/playerView'
-import { cardName, disorderName, locale, localizeError, phaseName, t } from '../i18n'
+import { localizeError, phaseName, t } from '../i18n'
 import { GameCard } from './cards/GameCard'
 import { CardBack } from './cards/CardBack'
-import { DisorderIcon } from './cards/DisorderIcon'
-import { getCardDefinition } from '../game/cards/catalog'
+import { OpponentAvatarBar } from './OpponentAvatarBar'
+import { GameLogDrawer } from './GameLogDrawer'
 
 type BoardCard =
   | Pick<
@@ -20,23 +20,6 @@ type BoardCard =
     >
   | PublicCardView
 type BoardPlayer = PlayerState | PlayerView
-
-export function selectPsycheSlot(
-  event: { stopPropagation: () => void },
-  slotId: string,
-  onSelect?: (slotId: string) => void,
-): void {
-  event.stopPropagation()
-  onSelect?.(slotId)
-}
-
-export function selectEpisodeTarget(
-  playerId: string,
-  disorderId: string,
-  onSelect: (playerId: string, disorderId: string) => void,
-): void {
-  onSelect(playerId, disorderId)
-}
 
 function slotsOf(
   player: BoardPlayer,
@@ -70,62 +53,62 @@ interface GameBoardProps {
 export function Psyche({
   player,
   playerId,
-  selectedId,
-  onSelect,
-  canSelect,
-  onInspect,
+  selectedCard,
+  viewerId,
+  isTargetingMode,
+  onTargetSlot,
 }: {
   player: BoardPlayer
   playerId: string
-  selectedId?: string
-  onSelect?: (playerId: string, slotId: string) => void
-  canSelect?: (slot: ReturnType<typeof slotsOf>[number]) => boolean
-  onInspect?: (slot: ReturnType<typeof slotsOf>[number]) => void
+  selectedCard?: BoardCard
+  viewerId: string
+  isTargetingMode: boolean
+  onTargetSlot: (ownerId: string, slotId: string) => void
 }) {
   return (
     <div className="psyche">
       {slotsOf(player).map((slot) => {
-        const drugDefinition = slot.drug
-          ? getCardDefinition(slot.drug.definitionId)
-          : undefined
+        const isOwn = playerId === viewerId
+        const isUntreated = !slot.drug
+        
+        let canSelect = false
+        if (selectedCard) {
+          if (selectedCard.cardType === 'drug' || selectedCard.cardType === 'therapy') {
+            canSelect = isOwn && isUntreated
+          } else if (selectedCard.cardType === 'episode') {
+            canSelect = !isOwn && isUntreated
+          }
+        }
+
+        const slotClass = [
+          'slot',
+          isTargetingMode ? (canSelect ? 'target-highlight targetable' : 'dimmed') : '',
+        ]
+          .filter(Boolean)
+          .join(' ')
+
         return (
-        <button
-          type="button"
-          className={`slot ${selectedId === slot.disorder.instanceId ? 'target-selected' : ''} ${canSelect?.(slot) ? 'targetable' : ''}`}
-          key={slot.disorder.instanceId}
-          onClick={(event) => {
-            // Never let a nested slot click trigger its player-panel handler.
-            event.stopPropagation()
-            if (canSelect?.(slot))
-              onSelect?.(playerId, slot.disorder.instanceId)
-            else onInspect?.(slot)
-          }}
-        >
-          <strong><DisorderIcon id={slot.disorder.definitionId as DisorderId} />{cardName(slot.disorder.definitionId, slot.disorder.displayName)}</strong>
-          <span className={slot.drug ? 'treated' : 'untreated'}>
-            {slot.drug ? t('treated') : t('untreated')}
-          </span>
-          <small className="slot-label">{t('episodeEffect')}</small>
-          <span className="slot-effect">
-            {locale.episodeDescriptions[slot.disorder.definitionId as DisorderId]}
-          </span>
-          {slot.drug && (
-            <section className="treatment-attachment">
-              <small>{t('treatedBy')}</small>
-              <strong>{cardName(slot.drug.definitionId, slot.drug.displayName)}</strong>
-              <small>{t('sideEffects')}</small>
-              {drugDefinition?.cardType === 'drug' && (
-                <div className="side-effect-list">
-                  {drugDefinition.sideEffects.map((effect) => (
-                    <span className="side-effect-chip" key={effect}>
-                      {disorderName(effect)}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </section>
-          )}
-        </button>
+          <button
+            type="button"
+            className={slotClass}
+            key={slot.disorder.instanceId}
+            onClick={(event) => {
+              event.stopPropagation()
+              if (canSelect) {
+                onTargetSlot(playerId, slot.disorder.instanceId)
+              }
+            }}
+          >
+            <span className={`slot-badge ${slot.drug ? 'treated' : 'untreated'}`}>
+              {slot.drug ? t('treated') : t('untreated')}
+            </span>
+            <GameCard card={slot.disorder} />
+            {slot.drug && (
+              <div className="drug-attachment">
+                <GameCard card={slot.drug} />
+              </div>
+            )}
+          </button>
         )
       })}
     </div>
@@ -144,8 +127,11 @@ function CardButton({
   return (
     <button
       type="button"
-      className={`card card-${card.cardType} ${selected ? 'selected' : ''}`}
-      onClick={onClick}
+      className={`card-button ${selected ? 'selected' : ''}`}
+      onClick={(event) => {
+        event.stopPropagation()
+        onClick()
+      }}
     >
       <GameCard card={card} />
     </button>
@@ -155,351 +141,198 @@ function CardButton({
 export function GameBoard(props: GameBoardProps) {
   const { game } = props
   const current = game.players[game.currentPlayerIndex]
-  const drawPileCount =
-    'drawPile' in game ? game.drawPile.length : game.drawPileCount
-  const discardPileCount =
-    'discardPile' in game ? game.discardPile.length : game.discardPileCount
+  const drawPileCount = 'drawPile' in game ? game.drawPile.length : game.drawPileCount
+  const discardPileCount = 'discardPile' in game ? game.discardPile.length : game.discardPileCount
   const viewer =
-    game.players.find(
-      (player) => player.id === (props.viewerPlayerId ?? game.currentPlayerId),
-    ) ?? current
+    game.players.find((player) => player.id === (props.viewerPlayerId ?? game.currentPlayerId)) ??
+    current
   const viewerHand = handOf(viewer)
   const isViewerTurn = viewer.id === game.currentPlayerId
+
   const [selectedCardId, setSelectedCardId] = useState<string>()
-  const [targetPlayerId, setTargetPlayerId] = useState<string>()
-  const [targetDisorderId, setTargetDisorderId] = useState<string>()
-  const [chosenCardId, setChosenCardId] = useState<string>()
-  const [tremorsIds, setTremorsIds] = useState<string[]>([])
-  const [inspectedSlot, setInspectedSlot] = useState<{
-    disorder: BoardCard
-    drug?: BoardCard
-  }>()
-  const [showLog, setShowLog] = useState(false)
   const [focusedOpponentId, setFocusedOpponentId] = useState<string>()
-  const selectedCard = viewerHand.find(
-    (card) => card.instanceId === selectedCardId,
-  )
-  const target = game.players.find((player) => player.id === targetPlayerId)
-  const untreatedOwn = slotsOf(viewer).filter((slot) => !slot.drug)
-  const untreatedTarget = target
-    ? slotsOf(target).filter((slot) => !slot.drug)
-    : []
-  const targetHand = target ? handOf(target) : []
+  const [showLog, setShowLog] = useState(false)
+  const [isLocked, setIsLocked] = useState(false) // Lock interactions while waiting for server
+
+  const selectedCard = viewerHand.find((card) => card.instanceId === selectedCardId)
+  const isTargetingMode = selectedCard !== undefined
+
   const opponents = game.players.filter((player) => player.id !== viewer.id)
   const focusedOpponent =
     opponents.find((player) => player.id === focusedOpponentId) ??
     opponents.find((player) => player.id === game.currentPlayerId) ??
     opponents[0]
-  const resetChoice = () => {
-    setSelectedCardId(undefined)
-    setTargetDisorderId(undefined)
-    setChosenCardId(undefined)
-    setTremorsIds([])
-  }
-  const selectPlayer = (playerId: string) => {
-    setTargetPlayerId(playerId)
-    setTargetDisorderId(undefined)
-    setChosenCardId(undefined)
-    setTremorsIds([])
-  }
 
   useEffect(() => {
-    if (
-      selectedCardId &&
-      !viewerHand.some((card) => card.instanceId === selectedCardId)
-    ) {
-      resetChoice()
+    // Unlock interaction when game state changes (server responded)
+    setIsLocked(false)
+    if (selectedCardId && !viewerHand.some((card) => card.instanceId === selectedCardId)) {
+      setSelectedCardId(undefined)
     }
-  }, [viewer.id, viewerHand, selectedCardId])
+  }, [game.turnNumber, game.turn.cardsPlayedThisTurn, game.turn.phase, viewerHand])
 
   useEffect(() => {
-    if (focusedOpponent && focusedOpponent.id !== focusedOpponentId)
+    if (focusedOpponent && focusedOpponent.id !== focusedOpponentId) {
       setFocusedOpponentId(focusedOpponent.id)
+    }
   }, [focusedOpponent, focusedOpponentId])
 
-  const actionPanel = useMemo(() => {
-    if (!selectedCard) return <p>{t('selectCard')}</p>
-    if (!isViewerTurn) return <p>{t('waitingFor', { player: current.name })}</p>
-    if (game.turn.phase === 'discard')
-      return (
-        <button
-          type="button"
-          className="primary"
-          onClick={() => {
-            props.onDiscard(selectedCard.instanceId)
-          }}
-        >
-          {t('discardSelected')}
-        </button>
-      )
-    if (game.turn.phase !== 'play') return <p>{t('drawBeforePlay')}</p>
-    if (selectedCard.cardType === 'drug') return <p>{t('ownUntreatedDisorder')}</p>
-    if (selectedCard.cardType === 'therapy') return <p>{t('ownUntreatedDisorder')}</p>
-    if (selectedCard.cardType === 'disorder') return <p>{t('selectOpponent')}</p>
-    const targetDisorder = untreatedTarget.find(
-      (slot) => slot.disorder.instanceId === targetDisorderId,
-    )
-    const isAnxiety = targetDisorder?.disorder.definitionId === 'anxiety'
-    const isTremors = targetDisorder?.disorder.definitionId === 'tremors'
-    const missingAnxietyChoice =
-      isAnxiety && targetHand.length > 0 && !chosenCardId
-    const invalidTremorsChoice =
-      isTremors && targetHand.length >= 3 && tremorsIds.length !== 3
-    return (
-      <>
-        <p>
-          {targetDisorder && target
-            ? t('selectedDisorderPlayer', {
-                disorder: cardName(
-                  targetDisorder.disorder.definitionId,
-                  targetDisorder.disorder.displayName,
-                ),
-                player: target.name,
-              })
-            : target
-              ? t('targetUntreatedDisorder')
-              : t('selectOpponent')}
-        </p>
-        {isAnxiety && target && targetHand.length > 0 && (
-          <label>
-            {t('takeCard')}
-            <select
-              value={chosenCardId ?? ''}
-              onChange={(event) =>
-                setChosenCardId(event.target.value || undefined)
-              }
-            >
-              <option value="">{t('chooseCard')}</option>
-              {targetHand.map((card) => (
-                <option key={card.instanceId} value={card.instanceId}>
-                  {cardName(card.definitionId, card.displayName)}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        {isTremors && target && targetHand.length >= 3 && (
-          <fieldset>
-            <legend>{t('tremorsChoice')}</legend>
-            {targetHand.map((card) => (
-              <label className="check" key={card.instanceId}>
-                <input
-                  type="checkbox"
-                  checked={tremorsIds.includes(card.instanceId)}
-                  onChange={() =>
-                    setTremorsIds((ids) =>
-                      ids.includes(card.instanceId)
-                        ? ids.filter((id) => id !== card.instanceId)
-                        : [...ids, card.instanceId],
-                    )
-                  }
-                />
-                {cardName(card.definitionId, card.displayName)}
-              </label>
-            ))}
-          </fieldset>
-        )}
-        <button
-          type="button"
-          className="primary"
-          disabled={
-            !targetPlayerId ||
-            !targetDisorderId ||
-            missingAnxietyChoice ||
-            invalidTremorsChoice
-          }
-          onClick={() => {
-            if (targetPlayerId && targetDisorderId) {
-              props.onPlayEpisode(
-                selectedCard.instanceId,
-                targetPlayerId,
-                targetDisorderId,
-                { chosenCardId, tremorsDiscardCardIds: tremorsIds },
-              )
-            }
-          }}
-        >
-          {t('playEpisode')}
-        </button>
-      </>
-    )
-  }, [
-    selectedCard,
-    game.turn.phase,
-    targetPlayerId,
-    targetDisorderId,
-    target,
-    untreatedOwn,
-    untreatedTarget,
-    chosenCardId,
-    tremorsIds,
-  ])
+  // Cancel targeting on escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedCardId(undefined)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  const executeCommand = (action: () => void) => {
+    setIsLocked(true)
+    setSelectedCardId(undefined)
+    action()
+  }
+
+  const handleTargetSlot = (ownerId: string, slotId: string) => {
+    if (!selectedCard || isLocked || !isViewerTurn) return
+
+    if (selectedCard.cardType === 'drug' && ownerId === viewer.id) {
+      executeCommand(() => props.onPlayDrug(selectedCard.instanceId, slotId))
+    } else if (selectedCard.cardType === 'therapy' && ownerId === viewer.id) {
+      executeCommand(() => props.onPlayTherapy(selectedCard.instanceId, slotId))
+    } else if (selectedCard.cardType === 'episode' && ownerId !== viewer.id) {
+      // Pending decisions (anxiety/tremors) are handled by server, we just send the play Episode command.
+      // The server will transition to a pending decision state if needed.
+      executeCommand(() => props.onPlayEpisode(selectedCard.instanceId, ownerId, slotId))
+    }
+  }
+
+  const handleTargetOpponent = (opponentId: string) => {
+    if (!selectedCard || isLocked || !isViewerTurn) {
+      setFocusedOpponentId(opponentId) // Just focus if not targeting
+      return
+    }
+
+    if (selectedCard.cardType === 'disorder') {
+      executeCommand(() => props.onPlayDisorder(selectedCard.instanceId, opponentId))
+    } else {
+      setFocusedOpponentId(opponentId)
+    }
+  }
+
+  const handleBackgroundClick = () => {
+    if (selectedCardId) setSelectedCardId(undefined)
+  }
 
   return (
-    <main className="game-board">
-      <header className="status-bar">
-        <strong>{t('currentPlayer')}: {current.name}</strong>
-        <span>{t('turn')} {game.turnNumber}</span>
-        <span>{t('phase')}: {phaseName(game.turn.phase)}</span>
-        <span>{t('cardsPlayed')}: {game.turn.cardsPlayedThisTurn}/2</span>
-        <span>{t('drawPile')}: {drawPileCount}</span>
-        <span>{t('discardPile')}: {discardPileCount}</span>
-      </header>
-      <section className="deck-area" aria-label={`${t('drawPile')} và ${t('discardPile')}`}>
-        <CardBack label={t('drawPile')} count={drawPileCount} />
-        <CardBack label={t('discardPile')} count={discardPileCount} />
-      </section>
-      {props.error && <p className="error">{localizeError(props.error)}</p>}
-      <section className="players focused-table">
-        {game.players.map((player) => (
-          <article
-            className={`player panel ${player.id === current.id ? 'current-player' : ''} ${player.id === viewer.id ? 'viewer-player' : ''} ${selectedCard?.cardType === 'disorder' && player.id !== viewer.id ? 'targetable player-target' : ''} ${targetPlayerId === player.id ? 'target-selected' : ''} ${game.players.length > 2 && player.id !== viewer.id && player.id !== focusedOpponent?.id ? 'seat-only' : ''}`}
-            key={player.id}
-            onClick={() => {
-              if (
-                selectedCard &&
-                player.id !== viewer.id &&
-                selectedCard.cardType === 'disorder'
-              ) {
-                props.onPlayDisorder(selectedCard.instanceId, player.id)
-                resetChoice()
-              } else if (player.id !== viewer.id) setFocusedOpponentId(player.id)
+    <main
+      className={`game-board ${isTargetingMode ? 'targeting-mode' : ''} ${isLocked ? 'interaction-locked' : ''}`}
+      onClick={handleBackgroundClick}
+    >
+      <section className="opponent-zone">
+        {opponents.length > 1 && (
+          <OpponentAvatarBar
+            opponents={opponents}
+            focusedOpponentId={focusedOpponentId}
+            setFocusedOpponentId={handleTargetOpponent}
+            targetPlayerId={
+              isTargetingMode && selectedCard?.cardType === 'disorder' ? focusedOpponentId : undefined
+            }
+          />
+        )}
+        {focusedOpponent && (
+          <article 
+            className={`player opponent-player ${isTargetingMode && selectedCard?.cardType === 'disorder' ? 'target-highlight targetable' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation()
+              handleTargetOpponent(focusedOpponent.id)
             }}
           >
-            <h2 data-initial={player.name.slice(0, 1).toUpperCase()}>{player.name}</h2>
-            <p>{t('hand')}: {handOf(player).length}</p>
-            {(player.effects.skipTurns > 0 ||
-              player.effects.skipDrawTurns > 0 ||
-              player.effects.cannotPlayTurns > 0) && (
-              <p className="effects">
-                {t('effects')}:{' '}
-                {player.effects.skipTurns > 0 &&
-                  `${t('skipTurn')} ×${player.effects.skipTurns} `}
-                {player.effects.skipDrawTurns > 0 &&
-                  `${t('cannotDraw')} ×${player.effects.skipDrawTurns} `}
-                {player.effects.cannotPlayTurns > 0 &&
-                  `${t('cannotPlay')} ×${player.effects.cannotPlayTurns}`}
-              </p>
+            {opponents.length === 1 && (
+              <header className="opponent-header" style={{ marginBottom: '1rem', color: '#9bf6e5', fontWeight: 'bold' }}>
+                {focusedOpponent.name} — {t('hand')}: {'handCount' in focusedOpponent ? focusedOpponent.handCount : focusedOpponent.hand?.length}
+              </header>
             )}
-            {(game.players.length <= 2 || player.id === viewer.id || player.id === focusedOpponent?.id) && <Psyche
-              player={player}
-              playerId={player.id}
-              selectedId={
-                (selectedCard?.cardType === 'drug' || selectedCard?.cardType === 'therapy') && player.id === viewer.id
-                  ? targetDisorderId
-                  : selectedCard?.cardType === 'episode' && player.id === targetPlayerId
-                    ? targetDisorderId
-                    : undefined
-              }
-              canSelect={(slot) =>
-                !slot.drug &&
-                ((selectedCard?.cardType === 'drug' || selectedCard?.cardType === 'therapy')
-                  ? player.id === viewer.id
-                  : selectedCard?.cardType === 'episode'
-                    ? player.id !== viewer.id
-                    : false)
-              }
-              onSelect={(ownerId, slotId) => {
-                if (!selectedCard) return
-                if (selectedCard.cardType === 'episode')
-                  selectEpisodeTarget(ownerId, slotId, (playerId, disorderId) => {
-                    selectPlayer(playerId)
-                    setTargetDisorderId(disorderId)
-                    const targetSlot = slotsOf(player).find(
-                      (candidate) => candidate.disorder.instanceId === disorderId,
-                    )
-                    const effectId = targetSlot?.disorder.definitionId
-                    if (effectId !== 'anxiety' && effectId !== 'tremors') {
-                      props.onPlayEpisode(selectedCard.instanceId, playerId, disorderId)
-                      resetChoice()
-                    }
-                  })
-                if (
-                  (selectedCard.cardType === 'drug' || selectedCard.cardType === 'therapy') &&
-                  ownerId !== viewer.id
-                )
-                  return
-                if (selectedCard.cardType === 'drug') {
-                  props.onPlayDrug(selectedCard.instanceId, slotId)
-                  resetChoice()
-                }
-                if (selectedCard.cardType === 'therapy') {
-                  props.onPlayTherapy(selectedCard.instanceId, slotId)
-                  resetChoice()
-                }
-              }}
-              onInspect={(slot) => setInspectedSlot(slot)}
-            />}
-          </article>
-        ))}
-      </section>
-      {inspectedSlot && (
-        <section className="psyche-detail panel" aria-live="polite">
-          <header>
-            <strong>{t('psycheDetail')}</strong>
-            <button type="button" onClick={() => setInspectedSlot(undefined)}>
-              {t('close')}
-            </button>
-          </header>
-          <span className={inspectedSlot.drug ? 'treated' : 'untreated'}>
-            {inspectedSlot.drug ? t('treated') : t('untreated')}
-          </span>
-          <GameCard card={inspectedSlot.disorder} expanded />
-          {inspectedSlot.drug && (
-            <section className="treated-by">
-              <small>{t('treatedBy')}</small>
-              <GameCard card={inspectedSlot.drug} expanded />
-            </section>
-          )}
-        </section>
-      )}
-      <section className="hand panel own-hand">
-        <h2>{t('hand')} — {viewer.name}</h2>
-        <div className="cards">
-          {viewerHand.map((card) => (
-            <CardButton
-              card={card}
-              key={card.instanceId}
-              selected={card.instanceId === selectedCardId}
-              onClick={() => setSelectedCardId(card.instanceId)}
+            <Psyche
+              player={focusedOpponent}
+              playerId={focusedOpponent.id}
+              selectedCard={selectedCard}
+              viewerId={viewer.id}
+              isTargetingMode={isTargetingMode}
+              onTargetSlot={handleTargetSlot}
             />
-          ))}
-        </div>
-        <div className="action-panel">{actionPanel}</div>
-        {selectedCard && (
-          <button type="button" className="cancel-selection" onClick={resetChoice}>
-            {t('cancelSelection')}
-          </button>
+          </article>
         )}
       </section>
-      <button className="log-toggle" type="button" onClick={() => setShowLog(true)}>
+
+      <section className="center-zone">
+        <header className="status-bar">
+          <strong>{t('currentPlayer')}: {current.name}</strong>
+          <span>{t('turn')} {game.turnNumber}</span>
+          <span>{t('phase')}: {phaseName(game.turn.phase)}</span>
+          <span>{t('cardsPlayed')}: {game.turn.cardsPlayedThisTurn}/2</span>
+          <span>{t('drawPile')}: {drawPileCount}</span>
+          <span>{t('discardPile')}: {discardPileCount}</span>
+        </header>
+        <div className="deck-area">
+          <button type="button" style={{ padding: 0, background: 'none', border: 'none' }} onClick={() => !isLocked && props.onDraw()} disabled={!isViewerTurn || game.turn.phase !== 'draw'}>
+            <CardBack label={t('drawPile')} count={drawPileCount} />
+          </button>
+          <CardBack label={t('discardPile')} count={discardPileCount} />
+        </div>
+        <div className="action-bar">
+          {isTargetingMode && game.turn.phase === 'discard' && (
+            <button type="button" className="primary" onClick={() => {
+              const currentId = selectedCardId
+              if (currentId) executeCommand(() => props.onDiscard(currentId))
+            }}>
+              {t('discardSelected')}
+            </button>
+          )}
+          <button
+            type="button"
+            className="primary"
+            disabled={!isViewerTurn || game.turn.phase !== 'play' || isLocked}
+            onClick={() => executeCommand(props.onEndTurn)}
+          >
+            {t('endTurn')}
+          </button>
+        </div>
+      </section>
+
+      <section className="self-zone">
+        {props.error && <p className="error" style={{ marginBottom: '1rem' }}>{localizeError(props.error)}</p>}
+        <article className="player viewer-player">
+          <Psyche
+            player={viewer}
+            playerId={viewer.id}
+            selectedCard={selectedCard}
+            viewerId={viewer.id}
+            isTargetingMode={isTargetingMode}
+            onTargetSlot={handleTargetSlot}
+          />
+        </article>
+        <section className="hand own-hand">
+          <div className="cards">
+            {viewerHand.map((card) => (
+              <CardButton
+                card={card}
+                key={card.instanceId}
+                selected={card.instanceId === selectedCardId}
+                onClick={() => {
+                  if (selectedCardId === card.instanceId) setSelectedCardId(undefined)
+                  else setSelectedCardId(card.instanceId)
+                }}
+              />
+            ))}
+          </div>
+        </section>
+      </section>
+
+      <button className="log-toggle" type="button" onClick={() => setShowLog(!showLog)}>
         {t('gameLog')}
       </button>
-      {showLog && <section className="game-log panel" role="dialog">
-        <header><h2>{t('gameLog')}</h2><button type="button" onClick={() => setShowLog(false)}>{t('close')}</button></header>
-        <ol>
-          {props.gameLog.slice(-10).map((entry, index) => (
-            <li key={`${entry}-${index}`}>{entry}</li>
-          ))}
-        </ol>
-      </section>}
-      <footer className="button-row action-bar">
-        <button
-          type="button"
-          disabled={!isViewerTurn || game.turn.phase !== 'draw'}
-          onClick={props.onDraw}
-        >
-          {t('draw')}
-        </button>
-        <button
-          type="button"
-          className="primary"
-          disabled={!isViewerTurn || game.turn.phase !== 'play'}
-          onClick={props.onEndTurn}
-        >
-          {t('endTurn')}
-        </button>
-      </footer>
+
+      <GameLogDrawer gameLog={props.gameLog} showLog={showLog} setShowLog={setShowLog} />
     </main>
   )
 }
