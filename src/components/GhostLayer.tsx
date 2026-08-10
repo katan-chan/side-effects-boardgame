@@ -8,8 +8,8 @@ export type GhostCardType = Pick<CardInstance, 'instanceId' | 'definitionId' | '
 
 export interface GhostItem {
   id: string
-  startId: string
-  endId: string
+  startRect: DOMRect
+  endRect: DOMRect
   card?: GhostCardType
   type: 'card' | 'cardback'
 }
@@ -17,67 +17,75 @@ export interface GhostItem {
 let nextId = 0
 
 // Singleton event emitter for ghosts to avoid heavy context
-type GhostListener = (ghost: GhostItem) => void
+export type GhostListener = (ghost: GhostItem) => void
 const listeners = new Set<GhostListener>()
+export const __test_listeners = listeners
 
 export function triggerGhost(startId: string, endId: string, card?: GhostCardType, type: 'card' | 'cardback' = 'card') {
   if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    console.debug('Ghost animation skipped due to prefers-reduced-motion')
     return
   }
+
+  const startEl = document.getElementById(startId)
+  const endEl = document.getElementById(endId)
+
+  if (!startEl || !endEl) {
+    console.debug(`Ghost animation skipped due to missing DOM element: ${!startEl ? startId : ''} ${!endEl ? endId : ''}`)
+    return
+  }
+
+  const startRect = startEl.getBoundingClientRect()
+  const endRect = endEl.getBoundingClientRect()
+
   const id = `ghost-${nextId++}`
-  const ghost = { id, startId, endId, card, type }
+  const ghost = { id, startRect, endRect, card, type }
   listeners.forEach(fn => fn(ghost))
 }
 
 function GhostElement({ ghost, onComplete }: { ghost: GhostItem, onComplete: (id: string) => void }) {
-  const [style, setStyle] = useState<React.CSSProperties | null>(null)
+  const [style, setStyle] = useState<React.CSSProperties>({
+    position: 'fixed',
+    top: ghost.startRect.top,
+    left: ghost.startRect.left,
+    width: ghost.startRect.width,
+    height: ghost.startRect.height,
+    zIndex: 1000,
+    opacity: 1,
+    transform: 'scale(1)',
+    pointerEvents: 'none',
+    transition: 'none',
+  })
 
   useEffect(() => {
-    const startEl = document.getElementById(ghost.startId)
-    const endEl = document.getElementById(ghost.endId)
-    if (!startEl || !endEl) {
-      onComplete(ghost.id)
-      return
-    }
+    let frame2: number
 
-    const startRect = startEl.getBoundingClientRect()
-    const endRect = endEl.getBoundingClientRect()
-
-    // Initial position
-    setStyle({
-      position: 'fixed',
-      top: startRect.top,
-      left: startRect.left,
-      width: startRect.width,
-      height: startRect.height,
-      zIndex: 1000,
-      opacity: 1,
-      transform: 'scale(1)',
-      pointerEvents: 'none',
-    })
-
-    // Force reflow
-    void document.body.offsetHeight
-
-    // Animate to target
-    setStyle({
-      position: 'fixed',
-      top: endRect.top,
-      left: endRect.left,
-      width: endRect.width, // might be slightly warped if sizes differ heavily, but usually close enough
-      height: endRect.height,
-      zIndex: 1000,
-      opacity: 0,
-      transform: 'scale(0.8)',
-      transition: 'all 0.35s cubic-bezier(0.2, 0.8, 0.2, 1)',
-      pointerEvents: 'none',
+    const frame1 = requestAnimationFrame(() => {
+      frame2 = requestAnimationFrame(() => {
+        setStyle({
+          position: 'fixed',
+          top: ghost.endRect.top,
+          left: ghost.endRect.left,
+          width: ghost.endRect.width,
+          height: ghost.endRect.height,
+          zIndex: 1000,
+          opacity: 0,
+          transform: 'scale(0.8)',
+          transition: 'top 500ms cubic-bezier(0.2, 0.8, 0.2, 1), left 500ms cubic-bezier(0.2, 0.8, 0.2, 1), width 500ms cubic-bezier(0.2, 0.8, 0.2, 1), height 500ms cubic-bezier(0.2, 0.8, 0.2, 1), transform 500ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 150ms ease-out 350ms',
+          pointerEvents: 'none',
+        })
+      })
     })
 
     const timer = setTimeout(() => {
       onComplete(ghost.id)
-    }, 350)
+    }, 550)
 
-    return () => clearTimeout(timer)
+    return () => {
+      cancelAnimationFrame(frame1)
+      cancelAnimationFrame(frame2)
+      clearTimeout(timer)
+    }
   }, [ghost, onComplete])
 
   if (!style) return null
