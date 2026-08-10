@@ -18,6 +18,15 @@ type BoardCard =
   | PublicCardView
 type BoardPlayer = PlayerState | PlayerView
 
+export function selectPsycheSlot(
+  event: { stopPropagation: () => void },
+  slotId: string,
+  onSelect?: (slotId: string) => void,
+): void {
+  event.stopPropagation()
+  onSelect?.(slotId)
+}
+
 function slotsOf(
   player: BoardPlayer,
 ): (PlayerState['psyche']['slots'][number] | PublicPsycheSlotView)[] {
@@ -63,7 +72,10 @@ function Psyche({
           type="button"
           className={`slot ${selectedId === slot.disorder.instanceId ? 'target-selected' : ''} ${onSelect ? 'targetable' : ''}`}
           key={slot.disorder.instanceId}
-          onClick={() => onSelect?.(slot.disorder.instanceId)}
+          onClick={(event) =>
+            // Player panels are also selectable Episode targets; a slot click must not reset it.
+            selectPsycheSlot(event, slot.disorder.instanceId, onSelect)
+          }
         >
           <strong>{cardName(slot.disorder.definitionId, slot.disorder.displayName)}</strong>
           <span className={slot.drug ? 'treated' : 'untreated'}>
@@ -223,7 +235,18 @@ export function GameBoard(props: GameBoardProps) {
       isTremors && targetHand.length >= 3 && tremorsIds.length !== 3
     return (
       <>
-        <p>{target ? t('targetUntreatedDisorder') : t('selectOpponent')}</p>
+        <p>
+          {targetDisorder
+            ? t('selectedDisorder', {
+                disorder: cardName(
+                  targetDisorder.disorder.definitionId,
+                  targetDisorder.disorder.displayName,
+                ),
+              })
+            : target
+              ? t('targetUntreatedDisorder')
+              : t('selectOpponent')}
+        </p>
         {isAnxiety && target && targetHand.length > 0 && (
           <label>
             {t('takeCard')}
