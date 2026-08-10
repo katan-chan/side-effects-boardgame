@@ -30,9 +30,10 @@ export function registerSocketHandlers(io: Server, rooms: RoomService): void {
       if (player.socketId)
         io.to(player.socketId).emit(
           'game:state',
-          createPlayerView(room.gameState, player.id),
+          createPlayerView(room.gameState, player.id, room.pendingDecision),
         )
     }
+    io.to(room.id).emit('game:log', room.gameLog)
   }
   const fail = (socket: Socket, error: unknown) =>
     socket.emit(
@@ -129,6 +130,33 @@ export function registerSocketHandlers(io: Server, rooms: RoomService): void {
         fail(socket, error)
       }
     })
+
+    socket.on(
+      'game:decision',
+      ({
+        decisionId,
+        choiceIds,
+      }: {
+        decisionId: string
+        choiceIds: string[]
+      }) => {
+        try {
+          const session = sessions.get(socket.id)
+          if (!session) throw new Error('Join a room first.')
+          rooms.resolveDecision(
+            session.roomId,
+            session.playerId,
+            decisionId,
+            choiceIds,
+          )
+          const room = rooms.getRoom(session.roomId)!
+          broadcastRoom(room)
+          broadcastGame(room)
+        } catch (error) {
+          fail(socket, error)
+        }
+      },
+    )
 
     socket.on('disconnect', () => {
       const session = sessions.get(socket.id)

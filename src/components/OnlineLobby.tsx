@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { GameBoard } from './GameBoard'
 import {
   createMultiplayerClient,
   type MultiplayerSession,
@@ -17,6 +18,7 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
   const [session, setSession] = useState<MultiplayerSession>()
   const [game, setGame] = useState<PlayerGameView>()
   const [error, setError] = useState<string>()
+  const [gameLog, setGameLog] = useState<string[]>([])
   const clientRef = useRef<ReturnType<typeof createMultiplayerClient> | null>(
     null,
   )
@@ -28,6 +30,7 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
         onRoomState: setRoom,
         onGameState: setGame,
         onError: setError,
+        onGameLog: setGameLog,
         onSessionRestored: setSession,
       },
     )
@@ -50,19 +53,75 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
   )
 
   if (game) {
+    const viewerId = session?.playerId ?? ''
+    const currentRoomPlayer = room?.players.find(
+      (player) => player.id === game.currentPlayerId,
+    )
     return (
-      <main className="setup-screen">
-        <section className="panel">
-          <h1>Online game started</h1>
-          <p>
-            Server-authoritative state connected. Current player:{' '}
-            {game.currentPlayerId}
-          </p>
-          <p>
-            Gameplay board integration remains intentionally separate from this
-            lobby sprint.
-          </p>
-        </section>
+      <main className="online-game">
+        <p className="connection-status">
+          {currentRoomPlayer?.connected === false
+            ? `${currentRoomPlayer.displayName} disconnected — waiting for reconnect`
+            : game.currentPlayerId === viewerId
+              ? 'Your turn'
+              : `Waiting for ${currentRoomPlayer?.displayName ?? 'current player'}`}
+        </p>
+        {game.pendingDecision && (
+          <PendingDecision
+            decision={game.pendingDecision}
+            viewerId={viewerId}
+            onResolve={(choiceIds) =>
+              clientRef.current?.resolveDecision(
+                game.pendingDecision!.id,
+                choiceIds,
+              )
+            }
+          />
+        )}
+        <GameBoard
+          game={game}
+          viewerPlayerId={viewerId}
+          error={error}
+          gameLog={gameLog}
+          onDraw={() => clientRef.current?.sendCommand({ type: 'draw' })}
+          onEndTurn={() => clientRef.current?.sendCommand({ type: 'endTurn' })}
+          onDiscard={(cardInstanceId) =>
+            clientRef.current?.sendCommand({ type: 'discard', cardInstanceId })
+          }
+          onPlayDrug={(drugCardId, disorderCardId) =>
+            clientRef.current?.sendCommand({
+              type: 'playDrug',
+              drugCardId,
+              disorderCardId,
+            })
+          }
+          onPlayDisorder={(disorderCardId, targetPlayerId) =>
+            clientRef.current?.sendCommand({
+              type: 'playDisorder',
+              disorderCardId,
+              targetPlayerId,
+            })
+          }
+          onPlayEpisode={(
+            episodeCardId,
+            targetPlayerId,
+            targetDisorderCardId,
+          ) =>
+            clientRef.current?.sendCommand({
+              type: 'playEpisode',
+              episodeCardId,
+              targetPlayerId,
+              targetDisorderCardId,
+            })
+          }
+          onPlayTherapy={(therapyCardId, disorderCardId) =>
+            clientRef.current?.sendCommand({
+              type: 'playTherapy',
+              therapyCardId,
+              disorderCardId,
+            })
+          }
+        />
       </main>
     )
   }
@@ -151,5 +210,68 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
         {error && <p className="error">{error}</p>}
       </section>
     </main>
+  )
+}
+
+function PendingDecision({
+  decision,
+  viewerId,
+  onResolve,
+}: {
+  decision: NonNullable<PlayerGameView['pendingDecision']>
+  viewerId: string
+  onResolve: (choices: string[]) => void
+}) {
+  const [selected, setSelected] = useState<string[]>([])
+  const isChooser = decision.chooserPlayerId === viewerId
+  if (!isChooser)
+    return (
+      <section className="panel pending-decision">
+        Waiting for a player to resolve {decision.kind}.
+      </section>
+    )
+  if (decision.kind === 'anxiety')
+    return (
+      <section className="panel pending-decision">
+        <h2>Anxiety: choose a hidden card</h2>
+        {decision.choices?.map((choice) => (
+          <button
+            type="button"
+            key={choice.id}
+            onClick={() => onResolve([choice.id])}
+          >
+            {choice.label}
+          </button>
+        ))}
+      </section>
+    )
+  return (
+    <section className="panel pending-decision">
+      <h2>Tremors: discard 3 cards</h2>
+      {decision.choices?.map((choice) => (
+        <label className="check" key={choice.id}>
+          <input
+            type="checkbox"
+            checked={selected.includes(choice.id)}
+            onChange={() =>
+              setSelected((ids) =>
+                ids.includes(choice.id)
+                  ? ids.filter((id) => id !== choice.id)
+                  : [...ids, choice.id],
+              )
+            }
+          />
+          {choice.label}
+        </label>
+      ))}
+      <button
+        type="button"
+        className="primary"
+        disabled={selected.length !== 3}
+        onClick={() => onResolve(selected)}
+      >
+        Discard 3 cards
+      </button>
+    </section>
   )
 }

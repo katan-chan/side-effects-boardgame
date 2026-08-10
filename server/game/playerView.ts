@@ -4,6 +4,7 @@ import type {
   PlayerState,
   PsycheSlot,
 } from '../../src/game/engine/types'
+import type { PendingDecision } from '../rooms/types'
 
 export interface PublicCardView {
   instanceId: string
@@ -28,6 +29,7 @@ export interface PlayerView {
 
 export interface PlayerGameView {
   players: PlayerView[]
+  currentPlayerIndex: number
   currentPlayerId: string
   turnNumber: number
   turn: GameState['turn']
@@ -35,6 +37,14 @@ export interface PlayerGameView {
   discardPileCount: number
   status: GameState['status']
   winnerPlayerId?: string
+  pendingDecision?: PendingDecisionView
+}
+
+export interface PendingDecisionView {
+  id: string
+  kind: 'anxiety' | 'tremors'
+  chooserPlayerId: string
+  choices?: { id: string; label: string }[]
 }
 
 function toCardView(card: CardInstance): PublicCardView {
@@ -56,7 +66,28 @@ function toPsycheSlotView(slot: PsycheSlot): PublicPsycheSlotView {
 export function createPlayerView(
   game: GameState,
   viewerPlayerId: string,
+  pendingDecision?: PendingDecision,
 ): PlayerGameView {
+  const decisionView = pendingDecision
+    ? {
+        id: pendingDecision.id,
+        kind: pendingDecision.kind,
+        chooserPlayerId: pendingDecision.chooserPlayerId,
+        ...(pendingDecision.chooserPlayerId === viewerPlayerId
+          ? {
+              choices: Object.keys(pendingDecision.choiceMap).map(
+                (id, index) => ({
+                  id,
+                  label:
+                    pendingDecision.kind === 'anxiety'
+                      ? `Card ${index + 1}`
+                      : id,
+                }),
+              ),
+            }
+          : {}),
+      }
+    : undefined
   return {
     players: game.players.map((player) => ({
       id: player.id,
@@ -68,6 +99,7 @@ export function createPlayerView(
         ? { hand: player.hand.map(toCardView) }
         : {}),
     })),
+    currentPlayerIndex: game.currentPlayerIndex,
     currentPlayerId: game.currentPlayerId,
     turnNumber: game.turnNumber,
     turn: game.turn,
@@ -75,5 +107,6 @@ export function createPlayerView(
     discardPileCount: game.discardPile.length,
     status: game.status,
     ...(game.winnerPlayerId ? { winnerPlayerId: game.winnerPlayerId } : {}),
+    ...(decisionView ? { pendingDecision: decisionView } : {}),
   }
 }

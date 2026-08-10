@@ -22,6 +22,7 @@ export interface MultiplayerClientHandlers {
   onGameState?: (game: PlayerGameView) => void
   onError?: (message: string) => void
   onSessionRestored?: (session: MultiplayerSession) => void
+  onGameLog?: (entries: string[]) => void
 }
 
 function storage(): Storage | undefined {
@@ -62,6 +63,7 @@ export function createMultiplayerClient(
   if (handlers.onRoomState) socket.on('room:state', handlers.onRoomState)
   if (handlers.onGameState) socket.on('game:state', handlers.onGameState)
   if (handlers.onError) socket.on('game:error', handlers.onError)
+  if (handlers.onGameLog) socket.on('game:log', handlers.onGameLog)
   socket.on('session:restored', (session: MultiplayerSession) => {
     saveSession(session)
     handlers.onSessionRestored?.(session)
@@ -85,5 +87,7 @@ export function createMultiplayerClient(
       }),
     startRoom: () => socket.emit('room:start'),
     sendCommand: (command: GameCommand) => socket.emit('game:command', command),
+    resolveDecision: (decisionId: string, choiceIds: string[]) =>
+      socket.emit('game:decision', { decisionId, choiceIds }),
   }
 }

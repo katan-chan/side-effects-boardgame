@@ -1,4 +1,5 @@
 import type { GameState } from '../../src/game/engine/types'
+import type { GameCommand } from '../game/commands'
 
 export interface RoomPlayer {
   id: string
@@ -13,4 +14,14 @@ export interface Room {
   players: RoomPlayer[]
   gameState?: GameState
   status: 'lobby' | 'playing' | 'finished'
+  pendingDecision?: PendingDecision
+  gameLog: string[]
+}
+
+export interface PendingDecision {
+  id: string
+  kind: 'anxiety' | 'tremors'
+  chooserPlayerId: string
+  command: Extract<GameCommand, { type: 'playEpisode' }>
+  choiceMap: Record<string, string>
 }

@@ -1,9 +1,34 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CardInstance } from '../game/cards/types'
 import type { GameState, PlayerState } from '../game/engine/types'
+import type {
+  PlayerGameView,
+  PlayerView,
+  PublicCardView,
+  PublicPsycheSlotView,
+} from '../../server/game/playerView'
+
+type BoardCard =
+  | Pick<
+      CardInstance,
+      'instanceId' | 'definitionId' | 'cardType' | 'displayName'
+    >
+  | PublicCardView
+type BoardPlayer = PlayerState | PlayerView
+
+function slotsOf(
+  player: BoardPlayer,
+): (PlayerState['psyche']['slots'][number] | PublicPsycheSlotView)[] {
+  return Array.isArray(player.psyche) ? player.psyche : player.psyche.slots
+}
+
+function handOf(player: BoardPlayer): BoardCard[] {
+  return player.hand ?? []
+}
 
 interface GameBoardProps {
-  game: GameState
+  game: GameState | PlayerGameView
+  viewerPlayerId?: string
   error?: string
   gameLog: string[]
   onDraw: () => void
@@ -20,10 +45,10 @@ interface GameBoardProps {
   onPlayTherapy: (therapyId: string, disorderId: string) => void
 }
 
-function Psyche({ player }: { player: PlayerState }) {
+function Psyche({ player }: { player: BoardPlayer }) {
   return (
     <div className="psyche">
-      {player.psyche.slots.map((slot) => (
+      {slotsOf(player).map((slot) => (
         <div className="slot" key={slot.disorder.instanceId}>
           <strong>{slot.disorder.displayName}</strong>
           <span className={slot.drug ? 'treated' : 'untreated'}>
@@ -41,7 +66,7 @@ function CardButton({
   selected,
   onClick,
 }: {
-  card: CardInstance
+  card: BoardCard
   selected: boolean
   onClick: () => void
 }) {
@@ -60,18 +85,30 @@ function CardButton({
 export function GameBoard(props: GameBoardProps) {
   const { game } = props
   const current = game.players[game.currentPlayerIndex]
+  const drawPileCount =
+    'drawPile' in game ? game.drawPile.length : game.drawPileCount
+  const discardPileCount =
+    'discardPile' in game ? game.discardPile.length : game.discardPileCount
+  const viewer =
+    game.players.find(
+      (player) => player.id === (props.viewerPlayerId ?? game.currentPlayerId),
+    ) ?? current
+  const viewerHand = handOf(viewer)
+  const isViewerTurn = viewer.id === game.currentPlayerId
   const [selectedCardId, setSelectedCardId] = useState<string>()
   const [targetPlayerId, setTargetPlayerId] = useState<string>()
   const [targetDisorderId, setTargetDisorderId] = useState<string>()
   const [chosenCardId, setChosenCardId] = useState<string>()
   const [tremorsIds, setTremorsIds] = useState<string[]>([])
-  const selectedCard = current.hand.find(
+  const selectedCard = viewerHand.find(
     (card) => card.instanceId === selectedCardId,
   )
   const target = game.players.find((player) => player.id === targetPlayerId)
-  const untreatedOwn = current.psyche.slots.filter((slot) => !slot.drug)
-  const untreatedTarget =
-    target?.psyche.slots.filter((slot) => !slot.drug) ?? []
+  const untreatedOwn = slotsOf(viewer).filter((slot) => !slot.drug)
+  const untreatedTarget = target
+    ? slotsOf(target).filter((slot) => !slot.drug)
+    : []
+  const targetHand = target ? handOf(target) : []
   const resetChoice = () => {
     setSelectedCardId(undefined)
     setTargetDisorderId(undefined)
@@ -92,7 +129,7 @@ export function GameBoard(props: GameBoardProps) {
       >
         <option value="">Choose opponent</option>
         {game.players
-          .filter((player) => player.id !== current.id)
+          .filter((player) => player.id !== viewer.id)
           .map((player) => (
             <option key={player.id} value={player.id}>
               {player.name}
@@ -105,14 +142,15 @@ export function GameBoard(props: GameBoardProps) {
   useEffect(() => {
     if (
       selectedCardId &&
-      !current.hand.some((card) => card.instanceId === selectedCardId)
+      !viewerHand.some((card) => card.instanceId === selectedCardId)
     ) {
       resetChoice()
     }
-  }, [current.id, current.hand, selectedCardId])
+  }, [viewer.id, viewerHand, selectedCardId])
 
   const actionPanel = useMemo(() => {
     if (!selectedCard) return <p>Select a card from your hand.</p>
+    if (!isViewerTurn) return <p>Waiting for {current.name}.</p>
     if (game.turn.phase === 'discard')
       return (
         <button
@@ -204,9 +242,9 @@ export function GameBoard(props: GameBoardProps) {
     const isAnxiety = targetDisorder?.disorder.definitionId === 'anxiety'
     const isTremors = targetDisorder?.disorder.definitionId === 'tremors'
     const missingAnxietyChoice =
-      isAnxiety && target && target.hand.length > 0 && !chosenCardId
+      isAnxiety && targetHand.length > 0 && !chosenCardId
     const invalidTremorsChoice =
-      isTremors && target && target.hand.length >= 3 && tremorsIds.length !== 3
+      isTremors && targetHand.length >= 3 && tremorsIds.length !== 3
     return (
       <>
         {targetPlayerControl}
@@ -233,7 +271,7 @@ export function GameBoard(props: GameBoardProps) {
             </select>
           </label>
         )}
-        {isAnxiety && target && target.hand.length > 0 && (
+        {isAnxiety && target && targetHand.length > 0 && (
           <label>
             Take card
             <select
@@ -243,7 +281,7 @@ export function GameBoard(props: GameBoardProps) {
               }
             >
               <option value="">Choose card</option>
-              {target.hand.map((card) => (
+              {targetHand.map((card) => (
                 <option key={card.instanceId} value={card.instanceId}>
                   {card.displayName}
                 </option>
@@ -251,10 +289,10 @@ export function GameBoard(props: GameBoardProps) {
             </select>
           </label>
         )}
-        {isTremors && target && target.hand.length >= 3 && (
+        {isTremors && target && targetHand.length >= 3 && (
           <fieldset>
             <legend>Tremors: discard exactly 3 target cards</legend>
-            {target.hand.map((card) => (
+            {targetHand.map((card) => (
               <label className="check" key={card.instanceId}>
                 <input
                   type="checkbox"
@@ -315,8 +353,8 @@ export function GameBoard(props: GameBoardProps) {
         <span>Turn {game.turnNumber}</span>
         <span>Phase: {game.turn.phase}</span>
         <span>Played: {game.turn.cardsPlayedThisTurn}/2</span>
-        <span>Draw: {game.drawPile.length}</span>
-        <span>Discard: {game.discardPile.length}</span>
+        <span>Draw: {drawPileCount}</span>
+        <span>Discard: {discardPileCount}</span>
       </header>
       {props.error && <p className="error">{props.error}</p>}
       <section className="players">
@@ -326,7 +364,7 @@ export function GameBoard(props: GameBoardProps) {
             key={player.id}
           >
             <h2>{player.name}</h2>
-            <p>Hand: {player.hand.length}</p>
+            <p>Hand: {handOf(player).length}</p>
             {(player.effects.skipTurns > 0 ||
               player.effects.skipDrawTurns > 0 ||
               player.effects.cannotPlayTurns > 0) && (
@@ -345,9 +383,9 @@ export function GameBoard(props: GameBoardProps) {
         ))}
       </section>
       <section className="hand panel">
-        <h2>{current.name}'s hand</h2>
+        <h2>{viewer.name}'s hand</h2>
         <div className="cards">
-          {current.hand.map((card) => (
+          {viewerHand.map((card) => (
             <CardButton
               card={card}
               key={card.instanceId}
@@ -369,7 +407,7 @@ export function GameBoard(props: GameBoardProps) {
       <footer className="button-row">
         <button
           type="button"
-          disabled={game.turn.phase !== 'draw'}
+          disabled={!isViewerTurn || game.turn.phase !== 'draw'}
           onClick={props.onDraw}
         >
           Draw
@@ -377,7 +415,7 @@ export function GameBoard(props: GameBoardProps) {
         <button
           type="button"
           className="primary"
-          disabled={game.turn.phase !== 'play'}
+          disabled={!isViewerTurn || game.turn.phase !== 'play'}
           onClick={props.onEndTurn}
         >
           End Turn

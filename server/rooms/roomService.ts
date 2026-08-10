@@ -1,12 +1,17 @@
 import { playDisorder } from '../../src/game/engine/disorderPlay'
 import { playDrug } from '../../src/game/engine/drugTreatment'
 import { playEpisode } from '../../src/game/engine/episode'
+import {
+  getEpisodeDecisionRequirement,
+  getEpisodePlayContext,
+} from '../../src/game/engine/episode'
 import { createGame } from '../../src/game/engine/setup'
 import { playTherapy } from '../../src/game/engine/therapy'
 import { discardCard, drawForTurn, endTurn } from '../../src/game/engine/turns'
 import type { GameState } from '../../src/game/engine/types'
 import type { GameCommand } from '../game/commands'
 import type { Room, RoomPlayer } from './types'
+import type { PendingDecision } from './types'
 
 export class RoomService {
   private readonly rooms = new Map<string, Room>()
@@ -22,6 +27,7 @@ export class RoomService {
       hostPlayerId: player.id,
       players: [player],
       status: 'lobby',
+      gameLog: [],
     }
     this.rooms.set(room.id, room)
     return { room, player }
@@ -89,6 +95,7 @@ export class RoomService {
       { playerIds: room.players.map((player) => player.id) },
     )
     room.status = 'playing'
+    room.gameLog.push('Game started.')
     return room
   }
 
@@ -104,9 +111,70 @@ export class RoomService {
     if (!roomPlayer) throw new Error('Player is not in this room.')
     if (!roomPlayer.connected)
       throw new Error('Disconnected players cannot send gameplay commands.')
+    if (room.pendingDecision)
+      throw new Error('Resolve the pending Episode decision first.')
 
     const game = room.gameState
+    if (command.type === 'playEpisode') {
+      const requirement = getEpisodeDecisionRequirement(
+        getEpisodePlayContext(
+          game,
+          playerId,
+          command.episodeCardId,
+          command.targetPlayerId,
+          command.targetDisorderCardId,
+        ),
+      )
+      if (requirement) {
+        room.pendingDecision = this.createPendingDecision(command, requirement)
+        return game
+      }
+    }
     const nextGame = this.applyCommand(game, playerId, command)
+    room.gameState = nextGame
+    room.gameLog = [...room.gameLog, this.publicLogEntry(game, command)].slice(
+      -30,
+    )
+    if (nextGame.status === 'finished') room.status = 'finished'
+    return nextGame
+  }
+
+  resolveDecision(
+    roomId: string,
+    playerId: string,
+    decisionId: string,
+    selectedChoiceIds: string[],
+  ): GameState {
+    const room = this.requireRoom(roomId)
+    const decision = room.pendingDecision
+    if (!room.gameState || !decision)
+      throw new Error('There is no pending decision.')
+    if (decision.id !== decisionId || decision.chooserPlayerId !== playerId)
+      throw new Error('This player cannot resolve that decision.')
+    const expectedCount = decision.kind === 'anxiety' ? 1 : 3
+    if (
+      selectedChoiceIds.length !== expectedCount ||
+      new Set(selectedChoiceIds).size !== expectedCount
+    )
+      throw new Error(`Choose exactly ${expectedCount} distinct cards.`)
+    const cardIds = selectedChoiceIds.map(
+      (choiceId) => decision.choiceMap[choiceId],
+    )
+    if (cardIds.some((cardId) => !cardId))
+      throw new Error('Invalid pending card choice.')
+    const command: GameCommand = {
+      ...decision.command,
+      options:
+        decision.kind === 'anxiety'
+          ? { chosenCardId: cardIds[0] }
+          : { tremorsDiscardCardIds: cardIds },
+    }
+    const nextGame = this.applyCommand(
+      room.gameState,
+      room.gameState.currentPlayerId,
+      command,
+    )
+    room.pendingDecision = undefined
     room.gameState = nextGame
     if (nextGame.status === 'finished') room.status = 'finished'
     return nextGame
@@ -164,6 +232,41 @@ export class RoomService {
     return code
   }
 
+  private publicLogEntry(game: GameState, command: GameCommand): string {
+    const actor =
+      game.players.find((player) => player.id === game.currentPlayerId)?.name ??
+      'A player'
+    const labels: Record<GameCommand['type'], string> = {
+      draw: 'drew cards',
+      playDrug: 'treated a Disorder',
+      playDisorder: 'played a Disorder on an opponent',
+      playEpisode: 'triggered an Episode',
+      playTherapy: 'used Therapy',
+      discard: 'discarded a card',
+      endTurn: 'ended their turn',
+    }
+    return `${actor} ${labels[command.type]}.`
+  }
+
+  private createPendingDecision(
+    command: Extract<GameCommand, { type: 'playEpisode' }>,
+    requirement: NonNullable<ReturnType<typeof getEpisodeDecisionRequirement>>,
+  ): PendingDecision {
+    const choiceMap = Object.fromEntries(
+      requirement.cardIds.map((cardId, index) => [
+        requirement.kind === 'anxiety' ? `choice-${index + 1}` : cardId,
+        cardId,
+      ]),
+    )
+    return {
+      id: `decision-${randomUUID()}`,
+      kind: requirement.kind,
+      chooserPlayerId: requirement.chooserPlayerId,
+      command,
+      choiceMap,
+    }
+  }
+
   private requireRoom(roomId: string): Room {
     const room = this.rooms.get(roomId)
     if (!room) throw new Error('Room not found.')
@@ -219,3 +322,4 @@ export class RoomService {
     }
   }
 }
+import { randomUUID } from 'node:crypto'

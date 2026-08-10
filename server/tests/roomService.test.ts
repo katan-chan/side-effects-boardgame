@@ -156,4 +156,38 @@ describe('authoritative rooms', () => {
         ?.hand,
     ).toBeUndefined()
   })
+
+  it('does not leak Anxiety pending hand choices to non-choosers', () => {
+    const { room } = startedRoom()
+    const game = room.gameState!
+    const attacker = game.players[game.currentPlayerIndex]
+    const target = game.players.find((player) => player.id !== attacker.id)!
+    const pending = {
+      id: 'decision-1',
+      kind: 'anxiety' as const,
+      chooserPlayerId: attacker.id,
+      command: {
+        type: 'playEpisode' as const,
+        episodeCardId: 'episode-01',
+        targetPlayerId: target.id,
+        targetDisorderCardId: target.psyche.slots[0].disorder.instanceId,
+      },
+      choiceMap: Object.fromEntries(
+        target.hand.map((card, index) => [
+          `choice-${index + 1}`,
+          card.instanceId,
+        ]),
+      ),
+    }
+
+    const attackerView = createPlayerView(game, attacker.id, pending)
+    const targetView = createPlayerView(game, target.id, pending)
+    expect(
+      attackerView.pendingDecision?.choices?.map((choice) => choice.label),
+    ).toEqual(target.hand.map((_, index) => `Card ${index + 1}`))
+    expect(targetView.pendingDecision?.choices).toBeUndefined()
+    expect(JSON.stringify(attackerView.pendingDecision)).not.toContain(
+      target.hand[0].instanceId,
+    )
+  })
 })
