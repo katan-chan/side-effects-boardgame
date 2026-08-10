@@ -283,6 +283,35 @@ export function discardCard(
     : nextGame
 }
 
+/** Voluntarily discards a card during the play phase and uses one action. */
+export function discardManual(
+  game: GameState,
+  playerId: string,
+  cardInstanceId: string,
+): GameState {
+  assertGameIsPlaying(game)
+  assertCurrentPlayer(game, playerId)
+  assertPhase(game, 'play')
+  if (cannotPlayCards(game.players[game.currentPlayerIndex])) {
+    throw new Error('The current player cannot play cards this turn.')
+  }
+  if (game.turn.cardsPlayedThisTurn >= MAX_CARDS_PLAYED_PER_TURN) {
+    throw new Error('A player may play at most two cards per turn.')
+  }
+  const currentPlayer = game.players[game.currentPlayerIndex]
+  const card = currentPlayer.hand.find((candidate) => candidate.instanceId === cardInstanceId)
+  if (!card) throw new Error('The selected card is not in the current player hand.')
+  return {
+    ...game,
+    players: replaceCurrentPlayer(game, {
+      ...currentPlayer,
+      hand: currentPlayer.hand.filter((candidate) => candidate.instanceId !== cardInstanceId),
+    }),
+    discardPile: [...game.discardPile, card],
+    turn: { ...game.turn, cardsPlayedThisTurn: game.turn.cardsPlayedThisTurn + 1 },
+  }
+}
+
 /** Ends a play phase, or enters discard phase when the hand exceeds six cards. */
 export function endTurn(game: GameState, playerId: string): GameState {
   assertGameIsPlaying(game)
@@ -295,4 +324,39 @@ export function endTurn(game: GameState, playerId: string): GameState {
   }
 
   return advanceTurn(game)
+}
+
+/** Ends the game immediately for the player who surrenders and returns their
+ * hand and all cards in their Psyche to the draw pile. */
+export function forfeitGame(
+  game: GameState,
+  playerId: string,
+  options: TurnCommandOptions = {},
+): GameState {
+  assertGameIsPlaying(game)
+  const playerIndex = game.players.findIndex((player) => player.id === playerId)
+  if (playerIndex === -1) throw new Error('Player is not in this game.')
+
+  const player = game.players[playerIndex]
+  const returnedCards = [
+    ...player.hand,
+    ...player.psyche.slots.flatMap((slot) =>
+      slot.drug ? [slot.disorder, slot.drug] : [slot.disorder],
+    ),
+  ]
+  const remainingPlayers = game.players.filter((candidate) => candidate.id !== playerId)
+  const winner = remainingPlayers[0]
+  if (!winner) throw new Error('A game needs another player to continue.')
+
+  return {
+    ...game,
+    drawPile: shuffle([...game.drawPile, ...returnedCards], options.rng ?? systemRandom),
+    players: game.players.map((candidate, index) =>
+      index === playerIndex
+        ? { ...candidate, hand: [], psyche: { slots: [] } }
+        : candidate,
+    ),
+    status: 'finished',
+    winnerPlayerId: winner.id,
+  }
 }

@@ -74,6 +74,8 @@ export function parseGameCommandPayload(payload: unknown): GameCommand {
   switch (requireString(record, 'type')) {
     case 'draw':
       return { type: 'draw' }
+    case 'forfeit':
+      return { type: 'forfeit' }
     case 'endTurn':
       return { type: 'endTurn' }
     case 'playDrug':
@@ -103,6 +105,8 @@ export function parseGameCommandPayload(payload: unknown): GameCommand {
       }
     case 'discard':
       return { type: 'discard', cardInstanceId: requireString(record, 'cardInstanceId') }
+    case 'discardManual':
+      return { type: 'discardManual', cardInstanceId: requireString(record, 'cardInstanceId') }
     default:
       throw new Error('Unknown game command.')
   }
@@ -222,6 +226,19 @@ export function registerSocketHandlers(io: Server, rooms: RoomService): void {
         const room = rooms.startRoom(session.roomId, session.playerId)
         broadcastRoom(room)
         broadcastGame(room)
+      } catch (error) {
+        fail(socket, error)
+      }
+    })
+
+    socket.on('room:leave', () => {
+      try {
+        const session = activeSession(socket)
+        const room = rooms.leaveRoom(session.roomId, session.playerId)
+        sessions.delete(socket.id)
+        socket.leave(session.roomId)
+        socket.emit('room:left')
+        if (room) broadcastRoom(room)
       } catch (error) {
         fail(socket, error)
       }

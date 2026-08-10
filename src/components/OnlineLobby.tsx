@@ -39,6 +39,11 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
         onGameLog: setGameLog,
         onConnectionState: setConnectionState,
         onSessionRestored: setSession,
+        onRoomLeft: () => {
+          setRoom(undefined)
+          setGame(undefined)
+          setSession(undefined)
+        },
       },
     )
     clientRef.current = client
@@ -98,9 +103,16 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
             setError(undefined)
             clientRef.current?.sendCommand({ type: 'endTurn' })
           }}
+          onForfeit={() => clientRef.current?.sendCommand({ type: 'forfeit' })}
+          onLeave={() => setGame(undefined)}
+          onClearError={() => setError(undefined)}
           onDiscard={(cardInstanceId) => {
             setError(undefined)
             clientRef.current?.sendCommand({ type: 'discard', cardInstanceId })
+          }}
+          onManualDiscard={(cardInstanceId) => {
+            setError(undefined)
+            clientRef.current?.sendCommand({ type: 'discardManual', cardInstanceId })
           }}
           onPlayDrug={(drugCardId, disorderCardId) => {
             setError(undefined)
@@ -147,94 +159,145 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
   return (
     <main className="setup-screen">
       <section className="panel online-lobby">
-        <button type="button" onClick={onBack}>
-          {t('back')}
+        <button
+          type="button"
+          style={{ background: 'none', border: 'none', color: 'var(--text-faint)', fontSize: '0.82rem', fontWeight: 700, padding: '0.3rem 0', marginBottom: '1rem', minHeight: 'unset', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+          onClick={onBack}
+        >
+          ← {t('back')}
         </button>
-        <h1>{t('onlineGame')}</h1>
+        <h1 className="gradient-text" style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '1.4rem' }}>{t('onlineGame')}</h1>
+
         {connectionState !== 'connected' && (
-          <p className="error">
+          <p className="error" style={{ marginBottom: '1rem' }}>
             {connectionState === 'unavailable'
               ? t('unavailable')
               : connectionState === 'connecting' ? t('connecting') : t('reconnecting')}
           </p>
         )}
+
         {!room && (
           <>
             <label className="name-field">
-              {t('displayName')}
+              <span className="label">{t('displayName')}</span>
               <input
+                className="field-input"
                 value={displayName}
+                placeholder="Nhập tên của bạn"
                 onChange={(event) => setDisplayName(event.target.value)}
               />
             </label>
-            <div className="button-row">
+            <div className="button-row" style={{ marginBottom: '0' }}>
               <button
                 type="button"
                 className="primary"
                 disabled={!displayName.trim()}
-                onClick={() =>
-                  clientRef.current?.createRoom(displayName.trim())
-                }
+                onClick={() => clientRef.current?.createRoom(displayName.trim())}
               >
-                {t('createRoom')}
+                + {t('createRoom')}
               </button>
             </div>
+
+            <div className="or-divider">hoặc</div>
+
             <label className="name-field">
-              {t('roomCode')}
-              <input
-                value={roomCode}
-                maxLength={6}
-                placeholder="ABC123"
-                onChange={(event) =>
-                  setRoomCode(event.target.value.toUpperCase())
-                }
-              />
+              <span className="label">{t('roomCode')}</span>
+              <div className="input-row">
+                <input
+                  className="field-input"
+                  style={{ textTransform: 'uppercase', letterSpacing: '0.2em', textAlign: 'center', fontWeight: 700 }}
+                  value={roomCode}
+                  maxLength={6}
+                  placeholder="ABC123"
+                  onChange={(event) => setRoomCode(event.target.value.toUpperCase())}
+                />
+                <button
+                  type="button"
+                  style={{ flex: '0 0 auto', padding: '0 1.2rem', fontWeight: 800, background: 'linear-gradient(135deg, var(--green), #16a34a)', color: '#022c15', border: 'none', borderRadius: 'var(--radius-sm)' }}
+                  disabled={!displayName.trim() || !roomCode.trim()}
+                  onClick={() => clientRef.current?.joinRoom(roomCode, displayName.trim())}
+                >
+                  Vào
+                </button>
+              </div>
             </label>
-            <button
-              type="button"
-              disabled={!displayName.trim() || !roomCode.trim()}
-              onClick={() =>
-                clientRef.current?.joinRoom(roomCode, displayName.trim())
-              }
-            >
-              {t('joinRoom')}
-            </button>
           </>
         )}
+
         {room && (
           <>
-            <p className="room-code">
-              {t('roomCode')}: <strong>{room.id}</strong>
-            </p>
-            <p>
-              {room.players.length}/8 {t('player').toLowerCase()}{' '}
-              {allConnected ? t('connected') : `— ${t('waitingForReconnect')}`}
-            </p>
-            <ul className="lobby-players">
-              {room.players.map((player) => (
-                <li key={player.id}>
-                  <strong>{player.displayName}</strong>
-                  {player.id === room.hostPlayerId && ` (${t('host')})`} —{' '}
-                  {player.connected ? t('connected') : t('disconnected')}
-                </li>
-              ))}
-            </ul>
-            {isHost && (
+            <div className="room-code-card">
+              <div>
+                <span className="lbl">Mã phòng</span>
+                <span className="room-code">{room.id}</span>
+              </div>
               <button
                 type="button"
-                className="primary"
-                disabled={!canStart}
-                onClick={() => clientRef.current?.startRoom()}
+                className="copy-btn"
+                onClick={() => navigator.clipboard.writeText(room.id)}
               >
-                {t('startGame')}
+                📋 Copy
               </button>
-            )}
-            {!isHost && <p>{t('waitingForHost')}</p>}
+            </div>
+
+            <p className="conn-line">
+              <strong>{room.players.length}</strong>/8 người chơi ·{' '}
+              {allConnected ? 'Đã kết nối' : t('waitingForReconnect')}
+            </p>
+
+            <ul className="lobby-players">
+              {room.players.map((player, idx) => {
+                const initials = player.displayName.charAt(0).toUpperCase()
+                const isHost = player.id === room.hostPlayerId
+                const isMe = player.id === session?.playerId
+                return (
+                  <li key={player.id}>
+                    <span className="player-avatar" style={{ background: `linear-gradient(135deg, hsl(${(idx * 60) % 360}, 60%, 45%), hsl(${(idx * 60 + 20) % 360}, 60%, 30%))` }}>
+                      {initials}
+                    </span>
+                    <span className="player-name-wrap">
+                      {player.displayName}
+                      {isMe && <span className="me-tag">BẠN</span>}
+                      {isHost && <span className="host-tag">👑 Chủ</span>}
+                    </span>
+                    <span className={`player-status ${player.connected ? 'connected' : ''}`}>
+                      {player.connected ? '● Đã kết nối' : '○ Đang chờ'}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+
+            <div className="button-row">
+              {isHost && (
+                <button
+                  type="button"
+                  className="primary"
+                  disabled={!canStart}
+                  onClick={() => clientRef.current?.startRoom()}
+                >
+                  {t('startGame')} ▶
+                </button>
+              )}
+              {!isHost && (
+                <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                  {t('waitingForHost')}
+                </p>
+              )}
+              <button
+                type="button"
+                className="btn-danger"
+                onClick={() => clientRef.current?.leaveRoom()}
+              >
+                Rời phòng
+              </button>
+            </div>
+            <p className="lobby-hint">Cần ít nhất <strong>2</strong> người chơi để bắt đầu.</p>
           </>
         )}
+
         {error && <p className="error">{localizeError(error)}</p>}
       </section>
     </main>
   )
 }
-

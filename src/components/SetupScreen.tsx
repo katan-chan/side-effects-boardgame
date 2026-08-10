@@ -14,13 +14,17 @@ export function SetupScreen({ error, onStart }: SetupScreenProps) {
   return (
     <main className="setup-screen">
       <section className="panel">
-        <h1>{t('title')}</h1>
-        <p>{t('localGame')}</p>
+        <h1 className="gradient-text">{t('title')}</h1>
+        <p style={{ color: 'var(--text-faint)', fontSize: '0.9rem', marginBottom: '1.4rem', marginTop: '0.15rem', fontWeight: 600 }}>
+          {t('localGame')}
+        </p>
+
         {names.map((name, index) => (
           <label className="name-field" key={`player-${index + 1}`}>
-            {t('player')} {index + 1}
-            <span>
+            <span className="label">{t('player')} {index + 1}</span>
+            <div className="input-row">
               <input
+                className="field-input"
                 value={name}
                 onChange={(event) =>
                   setNames((current) =>
@@ -32,18 +36,23 @@ export function SetupScreen({ error, onStart }: SetupScreenProps) {
               />
               <button
                 type="button"
+                className="icon-btn"
                 disabled={names.length <= 2}
+                aria-label={`Xóa Người chơi ${index + 1}`}
                 onClick={() =>
                   setNames((current) =>
                     current.filter((_, currentIndex) => currentIndex !== index),
                   )
                 }
               >
-                {t('remove')}
+                ✕
               </button>
-            </span>
+            </div>
           </label>
         ))}
+
+        <p className="player-count"><strong>{names.length}</strong>/8 người chơi</p>
+
         <div className="button-row">
           <button
             type="button"
@@ -55,7 +64,7 @@ export function SetupScreen({ error, onStart }: SetupScreenProps) {
               ])
             }
           >
-            {t('addPlayer')}
+            + {t('addPlayer')}
           </button>
           <button
             type="button"
@@ -66,8 +75,9 @@ export function SetupScreen({ error, onStart }: SetupScreenProps) {
             {t('startGame')}
           </button>
         </div>
-        {localError && (
-          <p className="error">Enter 2–8 non-empty player names.</p>
+
+        {localError && names.some((n) => !n.trim()) && (
+          <p className="error">Nhập 2–8 tên người chơi hợp lệ.</p>
         )}
         {error && <p className="error">{error}</p>}
       </section>

@@ -8,6 +8,13 @@ interface DecisionModalProps {
   onResolve: (decisionId: string, choiceIds: string[]) => void
 }
 
+const cardTypeLabel: Record<string, string> = {
+  drug: 'Thuốc',
+  disorder: 'Rối loạn',
+  therapy: 'Trị liệu',
+  episode: 'Cơn khủng hoảng',
+}
+
 export function DecisionModal({ decision, viewerPlayerId, onResolve }: DecisionModalProps) {
   const isChooser = decision.chooserPlayerId === viewerPlayerId
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -15,7 +22,8 @@ export function DecisionModal({ decision, viewerPlayerId, onResolve }: DecisionM
   if (!isChooser) {
     return (
       <div className="decision-overlay">
-        <div className="decision-modal panel">
+        <div className="decision-modal">
+          <span className="decision-tag">⏳ Đang chờ</span>
           <h2>{t('waitingForDecision')}</h2>
           <p>{t('waitingForOpponentToResolve', { kind: decision.kind })}</p>
         </div>
@@ -42,26 +50,51 @@ export function DecisionModal({ decision, viewerPlayerId, onResolve }: DecisionM
     (isTremors && selectedIds.length === 3) ||
     (isTremors && choices.length < 3 && selectedIds.length === choices.length)
 
+  const episodeLabel = isAnxiety ? '⚡ Cơn phát bệnh · Lo âu' : '⚡ Cơn phát bệnh · Run rẩy'
+
   return (
     <div className="decision-overlay">
-      <div className="decision-modal panel">
+      <div className="decision-modal">
+        <span className="decision-tag">{episodeLabel}</span>
         <h2>{t(isAnxiety ? 'anxietyDecision' : 'tremorsDecision')}</h2>
         <p>{t(isAnxiety ? 'anxietyPrompt' : 'tremorsPrompt')}</p>
-        
+
         <div className="decision-choices">
-          {choices.map((choice) => (
-            <label key={choice.id} className="decision-choice">
-              <input
-                type={isAnxiety ? 'radio' : 'checkbox'}
-                name="decision_choice"
-                value={choice.id}
-                checked={selectedIds.includes(choice.id)}
-                onChange={() => handleToggle(choice.id)}
-              />
-              {choice.label}
-            </label>
-          ))}
+          {choices.map((choice) => {
+            const cardType = (choice as { cardType?: string }).cardType
+            return (
+              <label key={choice.id} className="decision-choice">
+                <input
+                  type={isAnxiety ? 'radio' : 'checkbox'}
+                  name="decision_choice"
+                  value={choice.id}
+                  checked={selectedIds.includes(choice.id)}
+                  onChange={() => handleToggle(choice.id)}
+                />
+                <span className="c-name">{choice.label}</span>
+                {cardType && (
+                  <span className={`c-type type-${cardType}`}>
+                    {cardTypeLabel[cardType] ?? cardType}
+                  </span>
+                )}
+              </label>
+            )
+          })}
         </div>
+
+        {isTremors && (
+          <div className="decision-progress">
+            <div className="p-row">
+              <span>{selectedIds.length}/{Math.min(3, choices.length)} đã chọn</span>
+            </div>
+            <div className="p-bar">
+              <div
+                className="p-fill"
+                style={{ width: `${(selectedIds.length / Math.min(3, choices.length)) * 100}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         <button
           type="button"
@@ -69,7 +102,7 @@ export function DecisionModal({ decision, viewerPlayerId, onResolve }: DecisionM
           disabled={!isValid}
           onClick={() => onResolve(decision.id, selectedIds)}
         >
-          {t('confirm')}
+          ✓ {t('confirm')}
         </button>
       </div>
     </div>

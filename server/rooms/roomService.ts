@@ -8,7 +8,7 @@ import {
 } from '../../src/game/engine/episode'
 import { createGame } from '../../src/game/engine/setup'
 import { playTherapy } from '../../src/game/engine/therapy'
-import { discardCard, drawForTurn, endTurn } from '../../src/game/engine/turns'
+import { discardCard, discardManual, drawForTurn, endTurn, forfeitGame } from '../../src/game/engine/turns'
 import type { GameState } from '../../src/game/engine/types'
 import type { GameCommand } from '../game/commands'
 import type { Room, RoomPlayer } from './types'
@@ -330,6 +330,8 @@ export class RoomService {
       playTherapy: 'đã dùng Trị liệu',
       discard: 'đã bỏ một lá bài',
       endTurn: 'đã kết thúc lượt',
+      forfeit: 'đã xin thua',
+      discardManual: 'đã chủ động bỏ một lá bài',
     }
     return `${actor} ${labels[command.type]}.`
   }
@@ -371,6 +373,8 @@ export class RoomService {
     switch (command.type) {
       case 'draw':
         return drawForTurn(game, playerId)
+      case 'forfeit':
+        return forfeitGame(game, playerId)
       case 'playDrug':
         return playDrug(
           game,
@@ -403,6 +407,8 @@ export class RoomService {
         )
       case 'discard':
         return discardCard(game, playerId, command.cardInstanceId)
+      case 'discardManual':
+        return discardManual(game, playerId, command.cardInstanceId)
       case 'endTurn':
         return endTurn(game, playerId)
     }
