@@ -7,7 +7,10 @@ import type {
 } from '../cards/types'
 import { playDisorder } from '../engine/disorderPlay'
 import type { RandomSource } from '../engine/random'
-import { getExposedDisorders } from '../engine/sideEffects'
+import {
+  canReceiveDisorderInSlots,
+  getExposedDisorders,
+} from '../engine/sideEffects'
 import { createGame } from '../engine/setup'
 import { drawForTurn } from '../engine/turns'
 
@@ -113,7 +116,13 @@ function exposedScenario() {
   }
   const playableGame = moveToCurrentHand(withDrug, disorder)
 
-  return { game: playableGame, disorder, targetId: target.id, activeTreatment }
+  return {
+    game: playableGame,
+    disorder,
+    targetId: target.id,
+    activeTreatment,
+    exposedDisorderId,
+  }
 }
 
 const allCards = (game: ReturnType<typeof drawnGame>) => [
@@ -163,7 +172,7 @@ describe('Drug side effect metadata', () => {
   })
 
   it('exposes Side Effects from active Drugs', () => {
-    const { game, activeTreatment } = exposedScenario()
+    const { game, activeTreatment, exposedDisorderId } = exposedScenario()
     const target = game.players.find(
       (player) => player.id !== game.currentPlayerId,
     )!
@@ -183,6 +192,17 @@ describe('Drug side effect metadata', () => {
       'suicidal-thoughts',
       'anorexia',
     ])
+    expect(
+      canReceiveDisorderInSlots(
+        target.psyche.slots.map((slot) => ({
+          disorder: { definitionId: slot.disorder.definitionId },
+          ...(slot.drug
+            ? { drug: { definitionId: slot.drug.definitionId } }
+            : {}),
+        })),
+        exposedDisorderId,
+      ),
+    ).toBe(true)
   })
 })
 

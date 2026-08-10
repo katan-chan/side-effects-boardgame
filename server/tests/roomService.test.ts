@@ -219,6 +219,31 @@ describe('authoritative rooms', () => {
     ).toHaveLength(6)
   })
 
+  it('validates manual discard authoritatively and consumes one action', () => {
+    const { service, room } = startedRoom()
+    const game = room.gameState!
+    const afterDraw = service.executeCommand(room.id, game.currentPlayerId, {
+      type: 'draw',
+    })
+    const card = afterDraw.players[afterDraw.currentPlayerIndex].hand[0]
+
+    const afterDiscard = service.executeCommand(room.id, afterDraw.currentPlayerId, {
+      type: 'discardManual',
+      cardInstanceId: card.instanceId,
+    })
+    expect(afterDiscard.turn.cardsPlayedThisTurn).toBe(1)
+    expect(afterDiscard.discardPile).toContainEqual(card)
+
+    const beforeInvalid = structuredClone(afterDiscard)
+    expect(() =>
+      service.executeCommand(room.id, afterDraw.currentPlayerId, {
+        type: 'discardManual',
+        cardInstanceId: card.instanceId,
+      }),
+    ).toThrow('not in the current player hand')
+    expect(room.gameState).toEqual(beforeInvalid)
+  })
+
   it('rejects duplicate or stale commands without changing the authoritative game', () => {
     const { service, room } = startedRoom()
     const currentPlayerId = room.gameState!.currentPlayerId

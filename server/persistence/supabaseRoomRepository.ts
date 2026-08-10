@@ -39,6 +39,12 @@ export class SupabaseRoomRepository implements RoomRepository {
     })
   }
 
+  async deleteRoom(roomId: string): Promise<void> {
+    await this.request(`rooms?id=eq.${encodeURIComponent(roomId)}`, {
+      method: 'DELETE',
+    })
+  }
+
   async loadActive(): Promise<PersistedRoomSnapshot[]> {
     const response = await this.request('room_snapshots?select=state', {
       method: 'GET',

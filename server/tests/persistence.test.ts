@@ -43,6 +43,22 @@ describe('room persistence', () => {
     expect(repository.saveCount).toBe(4)
   })
 
+  it('deletes an empty lobby snapshot so it cannot restore after restart', async () => {
+    const repository = new InMemoryRoomRepository()
+    const service = new RoomService(repository, () => undefined)
+    const { room, player } = service.createRoom('Ada')
+    await service.flushPersistence(room.id)
+    expect(repository.readRoom(room.id)).toBeDefined()
+
+    service.leaveRoom(room.id, player.id)
+    await service.flushPersistence(room.id)
+    expect(repository.readRoom(room.id)).toBeUndefined()
+
+    const restartedService = new RoomService(repository, () => undefined)
+    await restartedService.restoreFromRepository()
+    expect(restartedService.getRoom(room.id)).toBeUndefined()
+  })
+
   it('round-trips and restores active rooms with disconnected players', async () => {
     const repository = new InMemoryRoomRepository()
     const { service, room, host, ben, hostSession, benSession } =
@@ -147,6 +163,7 @@ describe('room persistence', () => {
       async loadActive(): Promise<PersistedRoomSnapshot[]> {
         return []
       }
+      async deleteRoom(): Promise<void> {}
     }
     const repository = new DelayedRepository()
     const service = new RoomService(repository, () => undefined)
@@ -172,6 +189,7 @@ describe('room persistence', () => {
       async loadActive(): Promise<PersistedRoomSnapshot[]> {
         return []
       }
+      async deleteRoom(): Promise<void> {}
     }
 
     const repository = new FlakyRepository()
@@ -195,6 +213,7 @@ describe('room persistence', () => {
   it('skips legacy snapshots rather than restoring playerId-only sessions', async () => {
     const repository: RoomRepository = {
       save: async () => undefined,
+      deleteRoom: async () => undefined,
       loadActive: async () =>
         [
           {

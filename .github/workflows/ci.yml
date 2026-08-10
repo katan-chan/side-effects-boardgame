@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - dev
       - remaster
   pull_request:
 
@@ -25,6 +26,9 @@ jobs:
 
       - name: Run tests
         run: npm run test -- --run
+
+      - name: Run lint
+        run: npm run lint
 
       - name: Build
         run: npm run build

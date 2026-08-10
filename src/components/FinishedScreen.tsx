@@ -4,9 +4,14 @@ import { t } from '../i18n'
 interface FinishedScreenProps {
   winnerName: string
   onNewGame: () => void
+  actionLabel?: string
 }
 
-export function FinishedScreen({ winnerName, onNewGame }: FinishedScreenProps) {
+export function FinishedScreen({
+  winnerName,
+  onNewGame,
+  actionLabel,
+}: FinishedScreenProps) {
   const confettiRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -34,7 +39,7 @@ export function FinishedScreen({ winnerName, onNewGame }: FinishedScreenProps) {
         <h1 className="winner-name">{winnerName}</h1>
         <p className="winner-sub">{t('wins', { player: winnerName })} 🎉</p>
         <button type="button" className="primary" style={{ width: '100%', marginTop: '0.5rem' }} onClick={onNewGame}>
-          {t('newGame')}
+          {actionLabel ?? t('newGame')}
         </button>
       </section>
     </div>

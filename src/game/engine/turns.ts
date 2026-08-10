@@ -334,6 +334,10 @@ export function forfeitGame(
   options: TurnCommandOptions = {},
 ): GameState {
   assertGameIsPlaying(game)
+  assertCurrentPlayer(game, playerId)
+  if (game.players.length !== 2) {
+    throw new Error('Forfeit is currently supported only in two-player games.')
+  }
   const playerIndex = game.players.findIndex((player) => player.id === playerId)
   if (playerIndex === -1) throw new Error('Player is not in this game.')
 

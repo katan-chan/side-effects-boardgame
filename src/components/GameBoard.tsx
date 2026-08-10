@@ -9,6 +9,8 @@ import type {
 } from '../../server/game/playerView'
 import { disorderName, localizeError, phaseName, t } from '../i18n'
 import { getCardDefinition } from '../game/cards/catalog'
+import { canReceiveDisorderInSlots, type ExposureSlot } from '../game/engine/sideEffects'
+import { canTreatWithTherapy } from '../game/engine/therapy'
 import { GameCard } from './cards/GameCard'
 import { CardBack } from './cards/CardBack'
 import { OpponentAvatarBar } from './OpponentAvatarBar'
@@ -87,7 +89,12 @@ export function Psyche({
             canSelect = isOwn && isUntreated && definition?.cardType === 'drug' &&
               slot.disorder.definitionId === definition.treats
           } else if (selectedCard.cardType === 'therapy') {
-            canSelect = isOwn && isUntreated
+            const definition = getCardDefinition(slot.disorder.definitionId)
+            canSelect =
+              isOwn &&
+              isUntreated &&
+              definition?.cardType === 'disorder' &&
+              canTreatWithTherapy(definition)
           } else if (selectedCard.cardType === 'episode') {
             canSelect = !isOwn && isUntreated
           }
@@ -191,6 +198,17 @@ export function GameBoard(props: GameBoardProps) {
     opponents.find((player) => player.id === focusedOpponentId) ??
     opponents.find((player) => player.id === game.currentPlayerId) ??
     opponents[0]
+  const selectedDisorderDefinition =
+    selectedCard?.cardType === 'disorder'
+      ? getCardDefinition(selectedCard.definitionId)
+      : undefined
+  const canTargetFocusedOpponent =
+    selectedDisorderDefinition?.cardType === 'disorder' &&
+    focusedOpponent !== undefined &&
+    canReceiveDisorderInSlots(
+      slotsOf(focusedOpponent) as ExposureSlot[],
+      selectedDisorderDefinition.definitionId,
+    )
 
   useEffect(() => {
     // Unlock interaction when game state changes (server responded)
@@ -273,7 +291,7 @@ export function GameBoard(props: GameBoardProps) {
             Về phòng
           </button>
         )}
-        <button
+        {game.players.length === 2 && <button
           type="button"
           className="btn-danger top-action-btn"
           disabled={!isViewerTurn || game.status !== 'playing' || isLocked}
@@ -282,7 +300,7 @@ export function GameBoard(props: GameBoardProps) {
           }}
         >
           Xin thua
-        </button>
+        </button>}
         <button className="log-icon-btn top-action-icon" type="button" onClick={() => { audioManager.play('click'); setShowLog(!showLog) }} aria-label={t('gameLog')}>
           📜
         </button>
@@ -295,14 +313,18 @@ export function GameBoard(props: GameBoardProps) {
             focusedOpponentId={focusedOpponentId}
             setFocusedOpponentId={handleTargetOpponent}
             targetPlayerId={
-              isTargetingMode && selectedCard?.cardType === 'disorder' ? focusedOpponentId : undefined
+              isTargetingMode &&
+              selectedCard?.cardType === 'disorder' &&
+              canTargetFocusedOpponent
+                ? focusedOpponent.id
+                : undefined
             }
             currentPlayerId={game.currentPlayerId}
           />
         )}
         {focusedOpponent && (
           <article 
-            className={`player opponent-player ${isTargetingMode && selectedCard?.cardType === 'disorder' ? 'target-highlight targetable' : ''}`}
+            className={`player opponent-player ${isTargetingMode && selectedCard?.cardType === 'disorder' && canTargetFocusedOpponent ? 'target-highlight targetable' : ''}`}
             onClick={(e) => {
               e.stopPropagation()
               handleTargetOpponent(focusedOpponent.id)
@@ -313,7 +335,10 @@ export function GameBoard(props: GameBoardProps) {
                 {focusedOpponent.name} — {t('hand')}: {'handCount' in focusedOpponent ? focusedOpponent.handCount : focusedOpponent.hand?.length}
               </header>
             )}
-            {selectedCard?.cardType === 'disorder' && isViewerTurn && focusedOpponent.id === focusedOpponentId && (
+            {selectedCard?.cardType === 'disorder' &&
+              isViewerTurn &&
+              focusedOpponent.id === focusedOpponentId &&
+              canTargetFocusedOpponent && (
               <button
                 type="button"
                 className="primary apply-card-btn"

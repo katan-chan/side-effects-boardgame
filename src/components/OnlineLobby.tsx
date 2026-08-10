@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { GameBoard } from './GameBoard'
 import { DecisionModal } from './DecisionModal'
+import { FinishedScreen } from './FinishedScreen'
 import {
   createMultiplayerClient,
   multiplayerServerUrl,
@@ -64,6 +65,19 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
     allConnected,
   )
 
+  if (game?.status === 'finished') {
+    const winner = game.players.find(
+      (player) => player.id === game.winnerPlayerId,
+    )
+    return (
+      <FinishedScreen
+        winnerName={winner?.name ?? t('winner')}
+        onNewGame={onBack}
+        actionLabel={t('back')}
+      />
+    )
+  }
+
   if (game) {
     const viewerId = session?.playerId ?? ''
     const currentRoomPlayer = room?.players.find(
@@ -104,7 +118,6 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
             clientRef.current?.sendCommand({ type: 'endTurn' })
           }}
           onForfeit={() => clientRef.current?.sendCommand({ type: 'forfeit' })}
-          onLeave={() => setGame(undefined)}
           onClearError={() => setError(undefined)}
           onDiscard={(cardInstanceId) => {
             setError(undefined)

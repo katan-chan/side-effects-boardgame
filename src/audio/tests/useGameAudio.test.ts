@@ -1,78 +1,79 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { useGameAudio } from '../useGameAudio'
 import { audioManager } from '../audioManager'
-import * as React from 'react'
 import type { PlayerGameView } from '../../../server/game/playerView'
+
+const reactMocks = vi.hoisted(() => ({
+  useEffect: vi.fn(),
+  useRef: vi.fn(),
+}))
+
+vi.mock('react', () => reactMocks)
+
+import { useGameAudio } from '../useGameAudio'
+
+type Ref<T> = { current: T }
+
+function renderHook(
+  game: PlayerGameView,
+  viewerPlayerId: string,
+  refs: Array<Ref<unknown>>,
+) {
+  let refIndex = 0
+  let effect: (() => void) | undefined
+
+  reactMocks.useRef.mockImplementation((initialValue: unknown) => {
+    if (!refs[refIndex]) refs[refIndex] = { current: initialValue }
+    return refs[refIndex++]
+  })
+  reactMocks.useEffect.mockImplementation((callback: () => void) => {
+    effect = callback
+  })
+
+  useGameAudio(game, viewerPlayerId)
+  effect?.()
+}
 
 describe('useGameAudio', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    reactMocks.useEffect.mockReset()
+    reactMocks.useRef.mockReset()
     vi.spyOn(audioManager, 'play').mockImplementation(() => {})
   })
 
   it('skips audio on initial mount', () => {
     const game = { currentPlayerId: 'user-1' } as PlayerGameView
 
-    // Mock useRef and useEffect to execute immediately
-    let effectCb: any
-    const refs: any[] = []
-    let refIndex = 0
-    vi.spyOn(React, 'useRef').mockImplementation((init) => {
-      if (refs[refIndex] === undefined) refs[refIndex] = { current: init }
-      return refs[refIndex++]
-    })
-    vi.spyOn(React, 'useEffect').mockImplementation((cb) => {
-      effectCb = cb
-    })
-
-    useGameAudio(game, 'user-1')
-    ;(effectCb as () => void)()
+    renderHook(game, 'user-1', [])
 
     expect(audioManager.play).not.toHaveBeenCalled()
   })
 
   it('plays your-turn on turn transition', () => {
     let game = { currentPlayerId: 'opponent-1' } as PlayerGameView
-    const refs: any[] = [{ current: undefined }, { current: false }]
-    let refIndex = 0
-    vi.spyOn(React, 'useRef').mockImplementation(() => refs[refIndex++])
-    let effectCb: any
-    vi.spyOn(React, 'useEffect').mockImplementation((cb) => { effectCb = cb })
+    const refs: Array<Ref<unknown>> = [{ current: undefined }, { current: false }]
 
     // First render (mount)
-    refIndex = 0
-    useGameAudio(game, 'user-1')
-    ;(effectCb as () => void)()
+    renderHook(game, 'user-1', refs)
     expect(audioManager.play).not.toHaveBeenCalled()
 
     // Second render (transition)
     game = { currentPlayerId: 'user-1' } as PlayerGameView
-    refIndex = 0
-    useGameAudio(game, 'user-1')
-    ;(effectCb as () => void)()
+    renderHook(game, 'user-1', refs)
 
     expect(audioManager.play).toHaveBeenCalledWith('your-turn')
   })
 
   it('plays pending-alert on new pending decision', () => {
     let game = { pendingDecision: undefined } as PlayerGameView
-    const refs: any[] = [{ current: undefined }, { current: false }]
-    let refIndex = 0
-    vi.spyOn(React, 'useRef').mockImplementation(() => refs[refIndex++])
-    let effectCb: any
-    vi.spyOn(React, 'useEffect').mockImplementation((cb) => { effectCb = cb })
+    const refs: Array<Ref<unknown>> = [{ current: undefined }, { current: false }]
 
     // First render
-    refIndex = 0
-    useGameAudio(game, 'user-1')
-    ;(effectCb as () => void)()
+    renderHook(game, 'user-1', refs)
 
     // Second render with decision
-    game = { pendingDecision: { id: 'd-1' } } as any
-    refIndex = 0
-    useGameAudio(game, 'user-1')
-    ;(effectCb as () => void)()
+    game = { pendingDecision: { id: 'd-1' } } as PlayerGameView
+    renderHook(game, 'user-1', refs)
 
     expect(audioManager.play).toHaveBeenCalledWith('pending-alert')
   })
