@@ -1,4 +1,5 @@
 import type { Server, Socket } from 'socket.io'
+import { createChatGateway } from '../chat/chatGateway'
 import { createPlayerView } from '../game/playerView'
 import type { GameCommand } from '../game/commands'
 import { RoomService } from '../rooms/roomService'
@@ -132,6 +133,7 @@ export function parseDecisionPayload(payload: unknown): {
 
 export function registerSocketHandlers(io: Server, rooms: RoomService): void {
   const sessions = new Map<string, Session>()
+  const chat = createChatGateway({ io, rooms })
 
   const roomState = (room: Room) => ({
     id: room.id,
@@ -170,6 +172,8 @@ export function registerSocketHandlers(io: Server, rooms: RoomService): void {
   }
 
   io.on('connection', (socket) => {
+    chat.attach(socket, () => activeSession(socket), (error) => fail(socket, error))
+
     socket.on('room:create', (payload: unknown) => {
         try {
           const { displayName } = parseRoomCreatePayload(payload)
@@ -278,6 +282,7 @@ export function registerSocketHandlers(io: Server, rooms: RoomService): void {
     socket.on('disconnect', () => {
       const session = sessions.get(socket.id)
       sessions.delete(socket.id)
+      chat.release(socket.id)
       if (!session) return
       try {
         const room = rooms.markDisconnected(

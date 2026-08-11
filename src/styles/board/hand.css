@@ -15,6 +15,14 @@
      makes overflow spill off BOTH edges and the first card becomes
      unreachable. */
   justify-content: safe center;
+  /* Unconditional (no media query), so this is desktop's safety net too, not
+     just mobile's: online mode's third grid column (.has-chat, see
+     layout.css) leaves less width for the hand, and a seven-card hand
+     (HAND_LIMIT is 6, but a hand holds up to 7 mid-turn before the forced
+     discard) can outgrow it even at common desktop sizes. Overflow degrades
+     into a scroll instead of breaking the layout, and cards keep a legible
+     size. The mobile block in responsive.css only retunes snap/padding for
+     touch on top of this — it does not need to re-establish the scroll. */
   overflow-x: auto;
   scrollbar-width: none;
   /* overflow-x:auto forces overflow-y to auto too, which would clip the

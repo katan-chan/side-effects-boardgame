@@ -22,20 +22,31 @@
     minmax(var(--card-back-h), 1fr)
     auto;
   /* Sidebar column plus the board column; the sidebar spans all three rows
-     (see .player-sidebar below) while opponent/center/self stay in column 2. */
+     (see .player-sidebar below) while opponent/center/self stay in column 2.
+     Online mode adds a third column (see .has-chat below); local mode has no
+     peers to chat with, so this two-column shape stays the default. */
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
   background: transparent;
   box-shadow: inset 0 0 100px #000a;
   position: relative;
   z-index: 1;
 }
+/* --chat-w defaults to --sidebar-w (see chat.css) so the two wings are
+   symmetric out of the box; .chat-collapsed there overrides it to a narrow
+   rail without touching this rule. */
+.game-board.has-chat {
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr) var(--chat-w);
+}
 .game-board.interaction-locked { pointer-events: none; }
 .game-board.targeting-mode .opponent-zone,
 .game-board.targeting-mode .self-zone { background: rgba(0,0,0,.15); transition: background 0.2s; }
 
 /* Sidebar spans all three board rows in column 1; the board content
-   (opponent/center/self) lives in column 2. */
+   (opponent/center/self) lives in column 2. The chat sidebar (only present
+   with .has-chat) mirrors it from column 3; its visual treatment lives in
+   chat.css, same split as .player-sidebar/sidebar.css. */
 .player-sidebar { grid-column: 1; grid-row: 1 / -1; }
+.chat-sidebar { grid-column: 3; grid-row: 1 / -1; }
 .opponent-zone,
 .center-zone,
 .self-zone { grid-column: 2; }
@@ -52,6 +63,24 @@
   background: rgba(2,6,23,.7);
   border-bottom: 1px solid var(--card-border);
   backdrop-filter: blur(10px);
+}
+
+/* Online mode wraps .game-board with this status bar as a sibling (see
+   OnlineLobby), so .game-board's own 100dvh would grow the wrapper to
+   status-bar-height + 100dvh and push the bottom of the page off-screen.
+   The wrapper takes over ownership of the viewport height instead, and
+   .game-board falls back to auto + flex:1 so it still resolves to a
+   definite height (the leftover space after the status bar) — the grid's
+   1fr row needs that same definite-height guarantee described above. */
+.online-game {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.online-game > .game-board {
+  height: auto;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 /* ── Opponent Zone ── */

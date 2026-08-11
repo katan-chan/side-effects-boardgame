@@ -1,0 +1,249 @@
+/* ============================================================
+   CHAT PANEL
+   ============================================================ */
+
+:root {
+  /* Symmetric with the left sidebar by default, per --sidebar-w in
+     sidebar.css, so the two wings read as a matched pair; a single knob to
+     break that symmetry later without touching the grid rule itself. */
+  --chat-w: var(--sidebar-w);
+  /* Collapsed rail width: just enough for the toggle button and the unread
+     badge (see .chat-collapsed below), nothing else. */
+  --chat-rail-w: 3.2rem;
+}
+
+/* Mirrors .player-sidebar in sidebar.css (background, backdrop-filter,
+   padding, z-index) but with border-left instead of border-right, so the two
+   wings read as a matched pair from opposite edges of the board. Grid
+   placement (column 3, full row span) lives in layout.css alongside the
+   other grid rules, same split as .player-sidebar's. */
+.chat-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--card-border);
+  background: rgba(2, 12, 11, 0.35);
+  backdrop-filter: blur(6px);
+  padding: var(--zone-pad);
+  /* .top-actions is `position: fixed; top; right` (hand.css), pinned to the
+     viewport's top-right corner regardless of grid columns. Before this
+     sidebar existed, that corner belonged to the board's own-hand column; now
+     it lands on the chat heading instead, hiding the collapse toggle behind
+     the surrender button. Measured height of the fixed stack is ~5.9rem
+     (Xin thua + audio settings, stacked with gaps); reserve more than that
+     instead of the shared --zone-pad so nothing here is fixed-over. */
+  padding-top: calc(var(--zone-pad) + 6.5rem);
+  position: relative;
+  z-index: 3;
+}
+
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+  gap: 0.5rem;
+  /* Standalone contexts (the lobby) have no ancestor that bounds the panel's
+     height, so it needs its own; the sidebar and the drawer both override
+     this to fill their container instead. */
+  height: 22rem;
+  max-height: 22rem;
+}
+.chat-sidebar .chat-panel,
+.chat-drawer .chat-panel {
+  height: 100%;
+  max-height: none;
+}
+
+.chat-panel-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+}
+.chat-panel-heading > .chat-panel-title {
+  flex: 1 1 auto;
+  margin: 0;
+}
+/* --teal and --yellow are already the status and log panels' accents (see
+   sidebar.css), so chat gets its own to stay tellable apart at a glance. */
+.chat-panel-heading > .chat-panel-title::before {
+  content: '';
+  display: inline-block;
+  width: 3px;
+  height: 0.85em;
+  border-radius: 2px;
+  margin-right: 0.4rem;
+  background: var(--purple);
+}
+
+.chat-unread-badge {
+  flex: 0 0 auto;
+  min-width: 1.3rem;
+  height: 1.3rem;
+  padding: 0 0.35rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--purple);
+  color: #1a0b2e;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.chat-collapse-btn {
+  flex: 0 0 auto;
+  min-width: 0;
+  min-height: unset;
+  width: 1.8rem;
+  height: 1.8rem;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 0.85rem;
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid var(--card-border);
+}
+
+.chat-message-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.chat-message-list::-webkit-scrollbar { display: none; }
+
+.chat-empty {
+  flex: 1 1 auto;
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 0.8rem;
+}
+
+.chat-message {
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.6rem;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid var(--card-border);
+  font-size: 0.82rem;
+}
+/* Own messages read as sent, not received: the same accent as the panel
+   heading ties the whole thread visually back to it. */
+.chat-message-own {
+  background: rgba(168, 85, 247, 0.14);
+  border-color: rgba(168, 85, 247, 0.4);
+}
+.chat-message-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-bottom: 0.15rem;
+}
+.chat-message-author { font-weight: 700; color: var(--text-strong); }
+.chat-message-text {
+  margin: 0;
+  color: var(--text-strong);
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.chat-composer {
+  display: flex;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+}
+.chat-composer-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  resize: none;
+  max-height: 4.5rem;
+  font-family: inherit;
+  font-size: 0.82rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text);
+}
+.chat-composer-send {
+  flex: 0 0 auto;
+  min-height: unset;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.8rem;
+}
+
+/* ── Desktop collapse rail ──
+   One mechanism drives both effects: `.chat-collapsed` on `.game-board`
+   overrides --chat-w to the rail width (consumed by the grid rule in
+   layout.css) AND hides everything in the panel but the heading's toggle and
+   badge. Scoped through `.game-board.chat-collapsed`, not through
+   chatStore.isCollapsed alone, so the mobile drawer — which has no such
+   ancestor — is unaffected even if isCollapsed was left true from a previous
+   desktop session. */
+.game-board.chat-collapsed { --chat-w: var(--chat-rail-w); }
+.game-board.chat-collapsed .chat-sidebar {
+  padding: var(--zone-pad) 0.3rem;
+  /* Collapsed still shows the toggle button in the heading (see the
+     display:none list below), so it still needs the same top clearance from
+     .top-actions as the expanded sidebar — this shorthand above would
+     otherwise reset padding-top back to the bare --zone-pad. */
+  padding-top: calc(var(--zone-pad) + 6.5rem);
+  align-items: center;
+}
+.game-board.chat-collapsed .chat-panel-heading { flex-direction: column; }
+.game-board.chat-collapsed .chat-panel-title { display: none; }
+.game-board.chat-collapsed .chat-message-list,
+.game-board.chat-collapsed .chat-empty,
+.game-board.chat-collapsed .chat-composer { display: none; }
+
+/* The 💬 mobile toggle carries the same unread badge, pinned to its corner
+   instead of inline in a heading. */
+.chat-icon-btn { position: relative; }
+.chat-icon-badge {
+  position: absolute;
+  top: -0.3rem;
+  right: -0.3rem;
+}
+
+/* ── Mobile chat drawer ──
+   ChatDrawer.tsx renders `<section class="chat-drawer panel">`, meaning to
+   reuse .game-log-drawer's slide-up mechanism (overlays.css) the same way the
+   component comment says it does. Without this rule .chat-drawer only ever
+   picked up the generic .panel background/border and stayed
+   `position: relative` in normal flow instead of overlaying the board, so it
+   never actually behaved like a drawer. Anchored bottom-right like the log
+   drawer, which keeps it clear of .top-actions (pinned top-right) by
+   construction — the two never compete for the same corner. */
+.chat-drawer {
+  position: fixed;
+  z-index: var(--z-drawer);
+  right: 1rem;
+  bottom: 4rem;
+  width: min(24rem, calc(100vw - 2rem));
+  max-height: min(70dvh, 32rem);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slide-up-fade 0.25s ease-out;
+  background: rgba(15, 23, 42, .95);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, .6);
+  backdrop-filter: blur(8px);
+}
+.chat-drawer header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  flex: 0 0 auto;
+}
+.chat-drawer header h2 { margin: 0; font-size: 1.1rem; color: var(--text-strong); }
+.chat-drawer .chat-panel { min-height: 0; }

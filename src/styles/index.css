@@ -6,6 +6,7 @@
 @import './screens/finished.css';
 @import './board/layout.css';
 @import './board/sidebar.css';
+@import './board/chat.css';
 @import './board/psyche.css';
 @import './board/cards.css';
 @import './board/hand.css';

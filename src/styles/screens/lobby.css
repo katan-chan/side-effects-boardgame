@@ -1,4 +1,11 @@
 /* ── Online lobby — room code / player list ── */
+
+/* .gradient-text (base.css) is `display: inline-block` for the
+   background-clip gradient trick, which is invisible on its own but here
+   sits right after the back button's inline-flex box — without this block
+   override the two would render on the same line with no gap. */
+.online-lobby h1 { display: block; }
+
 .room-code-card {
   display: flex;
   align-items: center;
@@ -86,7 +93,63 @@
   padding: 0.08rem 0.4rem; border-radius: 999px;
   margin-left: 0.35rem;
 }
-.player-status { margin-left: auto; font-size: 0.72rem; font-weight: 700; color: var(--text-faint); }
+.player-status { margin-left: auto; font-size: 0.72rem; font-weight: 700; color: var(--text-faint); white-space: nowrap; }
 .player-status.ready { color: var(--yellow); }
 .player-status.connected { color: var(--teal); }
 .lobby-hint { margin-top: 0.9rem; text-align: center; font-size: 0.76rem; color: var(--text-faint); }
+
+/* ── Lobby + chat layout ──
+   setup.css sizes .online-lobby (34rem) for a player-list-only card. Once
+   the chat panel sits beside that list, splitting 34rem's ~445px content
+   box in two leaves each column too narrow for a player row to keep its
+   name, host badge, and connection status on one line — the row wraps
+   instead. Widening the card only `.has-chat` keeps the pre-chat lobby's
+   look exactly as it was. 860px total gives each column a floor above the
+   300px+ a Vietnamese "● Đã kết nối" row actually needs. */
+@media (min-width: 801px) {
+  .online-lobby.has-chat { width: min(100%, 860px); }
+}
+
+.lobby-body {
+  display: flex;
+  gap: 1.25rem;
+  align-items: flex-start;
+}
+/* min-width is the floor that keeps a player row on one line (measured,
+   not eyeballed — see the design doc's measurement table); flex-basis is
+   just a starting point before the two columns grow to fill the wider
+   card above. */
+.lobby-body .lobby-players {
+  flex: 1 1 300px;
+  min-width: 280px;
+}
+.lobby-body .chat-panel {
+  flex: 1 1 320px;
+  min-width: 280px;
+  /* chat.css's own .chat-panel comment already flags this: a standalone
+     context like the lobby has no ancestor to bound the panel's height, so
+     it hardcodes 22rem. That's taller than a lobby thread usually needs,
+     so the message list flex-grows into empty space and strands the
+     composer far below it. Sizing to content (height: auto) with a floor
+     (min-height, so zero messages doesn't collapse the panel) and a cap
+     (max-height, so a long thread scrolls instead of pushing the leave
+     button toward the fold) fixes both without touching chat.css, which
+     the sidebar and drawer placements still rely on. */
+  height: auto;
+  min-height: 14rem;
+  max-height: 20rem;
+}
+
+/* Below this the card is already full-width (responsive.css's mobile
+   rule), so there's no room left for two columns — stack chat under the
+   player list instead of crushing both. 800px matches the mobile
+   breakpoint used everywhere else (chat.css, responsive.css). */
+@media (max-width: 800px) {
+  .lobby-body { flex-direction: column; }
+  .lobby-body .lobby-players,
+  .lobby-body .chat-panel {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+  }
+}

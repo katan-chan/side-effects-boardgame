@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { GameBoard } from './GameBoard'
 import { DecisionModal } from './DecisionModal'
 import { FinishedScreen } from './FinishedScreen'
+import { ChatPanel } from './chat/ChatPanel'
 import {
   createMultiplayerClient,
   multiplayerServerUrl,
@@ -11,6 +12,7 @@ import {
 } from '../multiplayer/multiplayerClient'
 import type { PlayerGameView } from '../../server/game/playerView'
 import { localizeError, t } from '../i18n'
+import { useChatStore } from '../store/chatStore'
 
 interface OnlineLobbyProps {
   onBack: () => void
@@ -40,10 +42,12 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
         onGameLog: setGameLog,
         onConnectionState: setConnectionState,
         onSessionRestored: setSession,
+        onChatMessage: (message) => useChatStore.getState().append(message),
         onRoomLeft: () => {
           setRoom(undefined)
           setGame(undefined)
           setSession(undefined)
+          useChatStore.getState().reset()
         },
       },
     )
@@ -164,6 +168,7 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
               disorderCardId,
             })
           }}
+          onSendChat={(text) => clientRef.current?.sendChat(text)}
         />
       </main>
     )
@@ -171,7 +176,7 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
 
   return (
     <main className="setup-screen">
-      <section className="panel online-lobby">
+      <section className={`panel online-lobby${room ? ' has-chat' : ''}`}>
         <button
           type="button"
           style={{ background: 'none', border: 'none', color: 'var(--text-faint)', fontSize: '0.82rem', fontWeight: 700, padding: '0.3rem 0', marginBottom: '1rem', minHeight: 'unset', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
@@ -179,6 +184,12 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
         >
           ← {t('back')}
         </button>
+        {/* .gradient-text is `display: inline-block` (base.css) for the
+            background-clip gradient trick. That's invisible on its own, but
+            here it sits right after the back button's inline-flex box, so
+            without a block override (.online-lobby h1 in lobby.css) the two
+            render on the same line with no gap — pre-existing, not caused by
+            the chat panel. */}
         <h1 className="gradient-text" style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '1.4rem' }}>{t('onlineGame')}</h1>
 
         {connectionState !== 'connected' && (
@@ -258,28 +269,35 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
               {allConnected ? 'Đã kết nối' : t('waitingForReconnect')}
             </p>
 
-            <ul className="lobby-players">
-              {room.players.map((player, idx) => {
-                const initials = player.displayName.charAt(0).toUpperCase()
-                const isHost = player.id === room.hostPlayerId
-                const isMe = player.id === session?.playerId
-                return (
-                  <li key={player.id}>
-                    <span className="player-avatar" style={{ background: `linear-gradient(135deg, hsl(${(idx * 60) % 360}, 60%, 45%), hsl(${(idx * 60 + 20) % 360}, 60%, 30%))` }}>
-                      {initials}
-                    </span>
-                    <span className="player-name-wrap">
-                      {player.displayName}
-                      {isMe && <span className="me-tag">BẠN</span>}
-                      {isHost && <span className="host-tag">👑 Chủ</span>}
-                    </span>
-                    <span className={`player-status ${player.connected ? 'connected' : ''}`}>
-                      {player.connected ? '● Đã kết nối' : '○ Đang chờ'}
-                    </span>
-                  </li>
-                )
-              })}
-            </ul>
+            <div className="lobby-body">
+              <ul className="lobby-players">
+                {room.players.map((player, idx) => {
+                  const initials = player.displayName.charAt(0).toUpperCase()
+                  const isHost = player.id === room.hostPlayerId
+                  const isMe = player.id === session?.playerId
+                  return (
+                    <li key={player.id}>
+                      <span className="player-avatar" style={{ background: `linear-gradient(135deg, hsl(${(idx * 60) % 360}, 60%, 45%), hsl(${(idx * 60 + 20) % 360}, 60%, 30%))` }}>
+                        {initials}
+                      </span>
+                      <span className="player-name-wrap">
+                        {player.displayName}
+                        {isMe && <span className="me-tag">BẠN</span>}
+                        {isHost && <span className="host-tag">👑 Chủ</span>}
+                      </span>
+                      <span className={`player-status ${player.connected ? 'connected' : ''}`}>
+                        {player.connected ? '● Đã kết nối' : '○ Đang chờ'}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+              {/* Chat is available in the lobby too, not just in-game — negotiation can happen any time. */}
+              <ChatPanel
+                onSend={(text) => clientRef.current?.sendChat(text)}
+                viewerPlayerId={session?.playerId}
+              />
+            </div>
 
             <div className="button-row">
               {isHost && (

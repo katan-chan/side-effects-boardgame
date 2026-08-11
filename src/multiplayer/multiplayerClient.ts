@@ -1,4 +1,5 @@
 import { io, type Socket } from 'socket.io-client'
+import type { ChatMessage } from '../../server/chat/types'
 import type { GameCommand } from '../../server/game/commands'
 import type { PlayerGameView } from '../../server/game/playerView'
 
@@ -33,6 +34,7 @@ export interface MultiplayerClientHandlers {
   onGameLog?: (entries: string[]) => void
   onConnectionState?: (state: ConnectionState) => void
   onRoomLeft?: () => void
+  onChatMessage?: (message: ChatMessage) => void
 }
 
 function storage(): Storage | undefined {
@@ -81,6 +83,7 @@ export function createMultiplayerClient(
     handlers.onError?.(message)
   })
   if (handlers.onGameLog) socket.on('game:log', handlers.onGameLog)
+  if (handlers.onChatMessage) socket.on('chat:message', handlers.onChatMessage)
   socket.on('session:restored', (session: MultiplayerSession) => {
     saveSession(session)
     resumingSession = false
@@ -118,5 +121,6 @@ export function createMultiplayerClient(
     sendCommand: (command: GameCommand) => socket.emit('game:command', command),
     resolveDecision: (decisionId: string, choiceIds: string[]) =>
       socket.emit('game:decision', { decisionId, choiceIds }),
+    sendChat: (text: string) => socket.emit('chat:send', { text }),
   }
 }

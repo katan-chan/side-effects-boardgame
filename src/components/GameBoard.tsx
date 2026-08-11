@@ -21,6 +21,11 @@ import { GhostLayer, triggerGhost } from './GhostLayer'
 import { useGameAudio } from '../audio/useGameAudio'
 import { audioManager } from '../audio/audioManager'
 import { AudioSettings } from './AudioSettings'
+import { ChatPanel } from './chat/ChatPanel'
+import { ChatDrawer } from './chat/ChatDrawer'
+import { useLocalChatBot } from './chat/useLocalChatBot'
+import { createMessageId } from './chat/messageId'
+import { useChatStore } from '../store/chatStore'
 
 type BoardCard =
   | Pick<
@@ -50,6 +55,10 @@ interface GameBoardProps {
   onForfeit: () => void
   onLeave?: () => void
   onClearError?: () => void
+  /** Presence means online mode, same idiom as onLeave: messages go over the
+   *  socket. Absent in local mode, where GameBoard appends straight to
+   *  chatStore instead and a bot fakes the other hot-seat players. */
+  onSendChat?: (text: string) => void
   onDiscard: (cardId: string) => void
   onManualDiscard: (cardId: string) => void
   onPlayDrug: (drugId: string, disorderId: string) => void
@@ -176,8 +185,36 @@ export function GameBoard(props: GameBoardProps) {
   const [selectedCardId, setSelectedCardId] = useState<string>()
   const [focusedOpponentId, setFocusedOpponentId] = useState<string>()
   const [showLog, setShowLog] = useState(false)
+  const [showChat, setShowChat] = useState(false)
   const [isLocked, setIsLocked] = useState(false) // Lock interactions while waiting for server
   const [sortMode, setSortMode] = useState<'original' | 'type' | 'name'>('original')
+
+  const isOnlineChat = Boolean(props.onSendChat)
+  const isChatCollapsed = useChatStore((state) => state.isCollapsed)
+  const chatUnreadCount = useChatStore((state) => state.unreadCount)
+  const appendChatMessage = useChatStore((state) => state.append)
+  // Local mode has no server to relay through: a sent message is authored as
+  // the current hot-seat player and appended directly. Online mode's real
+  // send (props.onSendChat) takes over below; only one of the two ever runs.
+  const sendLocalChat = (text: string) => {
+    appendChatMessage({
+      kind: 'text',
+      id: createMessageId(),
+      author: { playerId: viewer.id, displayName: viewer.name },
+      sentAt: Date.now(),
+      text,
+    })
+  }
+  const sendChat = props.onSendChat ?? sendLocalChat
+  // Local hot-seat has no real peer, so a jittered timer fakes one — see
+  // useLocalChatBot. It no-ops on its own whenever isOnlineChat is true or
+  // the game has finished, so this call is unconditional like any hook.
+  useLocalChatBot({
+    enabled: !isOnlineChat,
+    players: game.players.map((player) => ({ id: player.id, name: player.name })),
+    excludeId: viewer.id,
+    isFinished: game.status === 'finished',
+  })
 
   useGameAudio(game as PlayerGameView, viewer.id)
 
@@ -293,7 +330,7 @@ export function GameBoard(props: GameBoardProps) {
 
   return (
     <main
-      className={`game-board ${isTargetingMode ? 'targeting-mode' : ''} ${isLocked ? 'interaction-locked' : ''}`}
+      className={`game-board ${isTargetingMode ? 'targeting-mode' : ''} ${isLocked ? 'interaction-locked' : ''} has-chat ${isChatCollapsed ? 'chat-collapsed' : ''}`}
       onClick={handleBackgroundClick}
     >
       <PlayerSidebar
@@ -305,6 +342,12 @@ export function GameBoard(props: GameBoardProps) {
         turnNumber={game.turnNumber}
         gameLog={props.gameLog}
       />
+      {/* Desktop sidebar renders in every mode, local hot-seat included, so the
+          board keeps the same three-column frame regardless of mode — only the
+          mobile drawer below stays online-only. */}
+      <aside className="chat-sidebar">
+        <ChatPanel onSend={sendChat} viewerPlayerId={viewer.id} />
+      </aside>
       <div className="top-actions" onClick={(event) => event.stopPropagation()}>
         {props.onLeave && (
           <button type="button" className="btn-danger top-action-btn" onClick={props.onLeave}>
@@ -324,6 +367,21 @@ export function GameBoard(props: GameBoardProps) {
         <button className="log-icon-btn top-action-icon" type="button" onClick={() => { audioManager.play('click'); setShowLog(!showLog) }} aria-label={t('gameLog')}>
           📜
         </button>
+        {props.onSendChat && (
+          <button
+            className="log-icon-btn top-action-icon chat-icon-btn"
+            type="button"
+            onClick={() => { audioManager.play('click'); setShowChat(!showChat) }}
+            aria-label={t('chatOpen')}
+          >
+            💬
+            {chatUnreadCount > 0 && (
+              <span className="chat-unread-badge chat-icon-badge" aria-label={t('chatUnread', { count: chatUnreadCount })}>
+                {chatUnreadCount}
+              </span>
+            )}
+          </button>
+        )}
         <AudioSettings />
       </div>
       <section className="opponent-zone">
@@ -541,6 +599,14 @@ export function GameBoard(props: GameBoardProps) {
       </section>
 
       <GameLogDrawer gameLog={props.gameLog} showLog={showLog} setShowLog={setShowLog} />
+      {props.onSendChat && (
+        <ChatDrawer
+          show={showChat}
+          onClose={() => setShowChat(false)}
+          onSend={props.onSendChat}
+          viewerPlayerId={viewer.id}
+        />
+      )}
       <GhostLayer />
     </main>
   )

@@ -30,9 +30,16 @@
   .game-board { --card-summary-lines: 3; }
   /* Phones keep the in-board .hud-glass status strip instead of the sidebar. */
   .player-sidebar { display: none; }
+  /* Same reasoning: the 💬 button + ChatDrawer replace this column on phones. */
+  .chat-sidebar { display: none; }
   /* Row 1 gains the face-down opponent hand, so it takes a slice off the deck
      and self rows rather than overflowing the clipped board. */
   .game-board { height: 100svh; overflow: hidden; width: 100vw; grid-template-rows: 35svh 12svh 53svh; grid-template-columns: 1fr; }
+  /* Online mode's wrapper (see layout.css .online-game) needs the same unit
+     swap here, or the status-bar-plus-board overflow this breakpoint fixed
+     for local mode comes right back for online mode on phones. */
+  .online-game { height: 100svh; }
+  .online-game > .game-board { height: auto; }
   .mobile-only { display: block !important; }
   .top-actions { top: 0.55rem; right: 0.55rem; width: 5.8rem; }
   /* .top-actions is fixed over the top-right corner. Margin, not padding: the
