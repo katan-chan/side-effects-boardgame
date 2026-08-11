@@ -1,21 +1,32 @@
-/* ── Card Backs ── */
+/* ── Card Backs ──
+   The artwork gets the card box to itself — no overlay, so its own gold
+   wordmark never has to compete with our text. The label + count render as a
+   caption underneath instead (a plain, un-masked line of text), stacked in
+   `.card-back-wrap`. */
+.card-back-wrap {
+  width: var(--card-back-w);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--card-back-w) * 0.04);
+}
 .card-back {
   width: var(--card-back-w); height: var(--card-back-h);
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 0.08rem;
   border-radius: var(--card-radius);
   border: 1px solid rgba(20,184,166,.4);
-  background: repeating-linear-gradient(135deg, rgba(20,184,166,.15) 0 8px, rgba(13,148,136,.1) 8px 16px);
-  overflow: hidden;
+  background: url('../../assets/cardback-512.webp') center / cover no-repeat;
 }
-.card-back-mark { font-size: max(0.9rem, calc(var(--card-back-w) * 0.19)); color: var(--teal); }
-.card-back small {
+.card-back-caption {
+  display: grid;
+  place-items: center;
+  gap: calc(var(--card-back-w) * 0.02);
+  line-height: 1.1;
+}
+.card-back-caption small {
   font-size: max(0.5rem, calc(var(--card-back-w) * 0.093));
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-muted);
 }
-.card-back strong { font-size: max(0.9rem, calc(var(--card-back-w) * 0.19)); color: var(--text-strong); }
+.card-back-caption strong { font-size: max(0.9rem, calc(var(--card-back-w) * 0.19)); color: var(--text-strong); }

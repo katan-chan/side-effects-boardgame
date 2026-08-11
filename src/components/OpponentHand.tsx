@@ -22,9 +22,7 @@ export function OpponentHand({
     >
       <div className="cards">
         {Array.from({ length: count }, (_, index) => (
-          <div className="facedown-card" key={index} aria-hidden="true">
-            <span className="facedown-mark">✦</span>
-          </div>
+          <div className="facedown-card" key={index} aria-hidden="true" />
         ))}
       </div>
     </section>

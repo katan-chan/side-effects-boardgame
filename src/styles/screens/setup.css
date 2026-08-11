@@ -10,31 +10,18 @@
 .setup-screen .panel { width: min(100%, 28rem); }
 .online-lobby { width: min(100%, 34rem); }
 
-/* Logo mark */
+/* Logo mark — the title art itself (see HomeScreen.tsx), not a box around
+   an emoji any more. min(100%, 300px) keeps it inside the panel's content
+   box at every breakpoint (measured down to the 800px mobile panel, whose
+   narrower padding leaves less room than the desktop 28rem panel). */
 .logo-mark {
-  width: 76px; height: 76px;
-  margin: 0 auto 1rem;
-  border-radius: 24px;
-  display: grid;
-  place-items: center;
-  font-size: 2.6rem;
-  background: linear-gradient(145deg, rgba(20,184,166,.2), rgba(15,23,42,.4));
-  border: 1px solid rgba(20,184,166,.35);
-  box-shadow: 0 0 40px rgba(20,184,166,.25);
+  display: block;
+  width: min(100%, 300px);
+  height: auto;
+  margin: 0 auto 0.9rem;
 }
 
 .home-screen { text-align: center; }
-.home-screen h1 {
-  font-size: clamp(2rem, 7vw, 3rem);
-  font-weight: 900;
-  letter-spacing: -.02em;
-  line-height: 1.1;
-  background: linear-gradient(90deg, #f8fafc, var(--teal) 55%, var(--green));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  margin-bottom: 0.3rem;
-}
 .home-screen .tagline {
   color: var(--text-muted);
   font-size: 1.05rem;

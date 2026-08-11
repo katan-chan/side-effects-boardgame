@@ -27,6 +27,22 @@ a { text-decoration: none; color: inherit; }
 button, input, select { font: inherit; font-weight: 500; }
 
 
+/* ── Accessibility ── */
+/* Keeps content in the accessibility tree and readable by search engines
+   without rendering it — standard "sr-only" clip pattern. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+
 /* ── Buttons ── */
 button {
   min-height: 2.75rem;

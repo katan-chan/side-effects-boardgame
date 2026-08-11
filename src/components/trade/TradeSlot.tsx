@@ -40,9 +40,7 @@ export function TradeSlot({ label, card, faceDown, placeholder, onClick, clickab
           </div>
         )
       ) : faceDown ? (
-        <div className="trade-slot-back" aria-label={placeholder}>
-          <span className="trade-slot-back-mark">✦</span>
-        </div>
+        <div className="trade-slot-back" aria-label={placeholder} />
       ) : isInteractive ? (
         <button type="button" className="trade-slot-empty" onClick={onClick}>
           {placeholder}
