@@ -8,6 +8,7 @@ import {
 } from '../../src/game/engine/episode'
 import { createGame } from '../../src/game/engine/setup'
 import { playTherapy } from '../../src/game/engine/therapy'
+import { tradeCards } from '../../src/game/engine/trading'
 import { discardCard, discardManual, drawForTurn, endTurn, forfeitGame } from '../../src/game/engine/turns'
 import type { GameState } from '../../src/game/engine/types'
 import { describeCommand } from '../../src/game/log/describeCommand'
@@ -408,6 +409,13 @@ export class RoomService {
         return discardManual(game, playerId, command.cardInstanceId)
       case 'endTurn':
         return endTurn(game, playerId)
+      case 'tradeCards':
+        return tradeCards(game, {
+          initiatorPlayerId: command.initiatorPlayerId,
+          initiatorCardId: command.initiatorCardId,
+          partnerPlayerId: command.partnerPlayerId,
+          partnerCardId: command.partnerCardId,
+        })
     }
   }
 }

@@ -64,6 +64,7 @@ function player(overrides: Partial<PlayerState> & { id: string; name: string }):
     hand: [],
     psyche: { slots: [] },
     effects: { skipTurns: 0, cannotPlayTurns: 0, skipDrawTurns: 0 },
+    tradeUsedThisTurn: false,
     ...overrides,
   }
 }
@@ -96,7 +97,7 @@ function baseGame(): GameState {
   const bob = player({
     id: 'p2',
     name: 'Bob',
-    hand: [],
+    hand: [disorderCard('impotence', 'bob-hand-card', 'Bob Secret Card')],
     psyche: {
       slots: [
         { disorder: disorderCard('gambling-addiction', 'psyche-target-gambling') },
@@ -150,11 +151,25 @@ describe('describeCommand', () => {
     discard: { type: 'discard', cardInstanceId: 'extra-card' },
     discardManual: { type: 'discardManual', cardInstanceId: 'extra-card' },
     endTurn: { type: 'endTurn' },
+    tradeCards: {
+      type: 'tradeCards',
+      initiatorPlayerId: 'p1',
+      initiatorCardId: 'drug-dep',
+      partnerPlayerId: 'p2',
+      partnerCardId: 'bob-hand-card',
+    },
   }
+
+  // tradeCards deliberately breaks the "actor" convention: unlike every other
+  // command, both parties' names are emphasised (see the anti-leak tests
+  // below), so it is excluded from the two generic actor-emphasis checks.
+  const commandsWithConventionalActor = Object.values(commandsByType).filter(
+    (command) => command.type !== 'tradeCards',
+  )
 
   it('names the actor for every command type', () => {
     const before = baseGame()
-    for (const command of Object.values(commandsByType)) {
+    for (const command of commandsWithConventionalActor) {
       const line = describeCommand(before, command, before)
       expect(line).toContain('Alice')
     }
@@ -162,7 +177,7 @@ describe('describeCommand', () => {
 
   it('never wraps the actor name in emphasis markers', () => {
     const before = baseGame()
-    for (const command of Object.values(commandsByType)) {
+    for (const command of commandsWithConventionalActor) {
       const line = describeCommand(before, command, before)
       expect(line).not.toContain('**Alice**')
     }
@@ -290,6 +305,31 @@ describe('describeCommand', () => {
 
     expect(line).toContain(`**${t('aCard')}**`)
     expect(line).toContain(`**${t('aDisorder')}**`)
+  })
+
+  it('names both players for tradeCards', () => {
+    const before = baseGame()
+    const line = describeCommand(before, commandsByType.tradeCards, before)
+    expect(line).toContain('Alice')
+    expect(line).toContain('Bob')
+  })
+
+  it('emphasises both player names for tradeCards', () => {
+    const before = baseGame()
+    const line = describeCommand(before, commandsByType.tradeCards, before)
+    expect(line).toContain('**Alice**')
+    expect(line).toContain('**Bob**')
+  })
+
+  it('never names either traded card for tradeCards, even though both are resolvable', () => {
+    const before = baseGame()
+    // Both card names below ARE resolvable from `before` (Fluoxetine is
+    // Alice's initiatorCardId 'drug-dep'; Bob Secret Card is her partner's
+    // partnerCardId 'bob-hand-card') to prove the log line omits them on
+    // purpose, not because the names could not be looked up.
+    const line = describeCommand(before, commandsByType.tradeCards, before)
+    expect(line).not.toContain('Fluoxetine')
+    expect(line).not.toContain('Bob Secret Card')
   })
 
   it('falls back to a generic actor and target name when players cannot be resolved', () => {

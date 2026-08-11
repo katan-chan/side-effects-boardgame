@@ -169,6 +169,22 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
             })
           }}
           onSendChat={(text) => clientRef.current?.sendChat(text)}
+          onInviteTrade={(targetPlayerId) =>
+            clientRef.current?.inviteTrade(targetPlayerId)
+          }
+          onAcceptTrade={() => clientRef.current?.acceptTrade()}
+          onDeclineTrade={() => clientRef.current?.declineTrade()}
+          onPlaceTradeCard={(cardInstanceId) =>
+            clientRef.current?.placeTradeCard(cardInstanceId)
+          }
+          onClearTradeCard={() => clientRef.current?.clearTradeCard()}
+          onConfirmTrade={() => clientRef.current?.confirmTrade()}
+          onCancelTrade={() => clientRef.current?.cancelTrade()}
+          tradeIneligiblePlayers={Object.fromEntries(
+            (room?.players ?? [])
+              .filter((player) => !player.connected)
+              .map((player) => [player.id, 'disconnected' as const]),
+          )}
         />
       </main>
     )

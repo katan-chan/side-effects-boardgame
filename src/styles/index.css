@@ -12,6 +12,7 @@
 @import './board/hand.css';
 @import './board/opponent-hand.css';
 @import './board/deck.css';
+@import './board/trade.css';
 @import './overlays.css';
 @import './animations.css';
 @import './responsive.css';

@@ -7,6 +7,7 @@ import {
 } from '../game/engine/episode'
 import { createGame } from '../game/engine/setup'
 import { playTherapy as playTherapyCommand } from '../game/engine/therapy'
+import { tradeCards as tradeCardsCommand } from '../game/engine/trading'
 import {
   discardCard as discardCardCommand,
   discardManual as discardManualCommand,
@@ -18,6 +19,8 @@ import type { GameState } from '../game/engine/types'
 import { describeCommand } from '../game/log/describeCommand'
 import { t } from '../i18n'
 import type { GameCommand } from '../../server/game/commands'
+
+type TradeCardsCommand = Extract<GameCommand, { type: 'tradeCards' }>
 
 type StoreAction = (game: GameState) => GameState
 
@@ -40,6 +43,13 @@ interface GameStore {
   manualDiscard: (cardInstanceId: string) => void
   endTurn: () => void
   forfeit: () => void
+  /**
+   * Commits a negotiated trade to the engine. Returns whether the engine
+   * accepted it — `localTradeDriver` needs this to tell a real commit apart
+   * from a rejection (e.g. quota already spent) without duplicating the
+   * engine's own validation in `src/game/engine/trading.ts`.
+   */
+  tradeCards: (command: TradeCardsCommand) => boolean
   resetGame: () => void
   clearError: () => void
 }
@@ -51,9 +61,12 @@ function errorMessage(error: unknown): string {
 }
 
 export const useGameStore = create<GameStore>((set, get) => {
-  const run = (action: StoreAction, command: GameCommand) => {
+  // Returns whether the command was applied, so callers that need to branch
+  // on success (currently only `tradeCards`, via `localTradeDriver`) can do
+  // so without re-deriving it from `error` state after the fact.
+  const run = (action: StoreAction, command: GameCommand): boolean => {
     const game = get().gameState
-    if (!game) return
+    if (!game) return false
     try {
       const nextGame = action(game)
       const entry = describeCommand(game, command, nextGame)
@@ -72,8 +85,10 @@ export const useGameStore = create<GameStore>((set, get) => {
           ...(winner ? [t('wins', { player: winner.name })] : []),
         ].slice(-30),
       })
+      return true
     } catch (error) {
       set({ error: errorMessage(error) })
+      return false
     }
   }
 
@@ -164,6 +179,8 @@ export const useGameStore = create<GameStore>((set, get) => {
       run((game) => forfeitGameCommand(game, game.currentPlayerId), {
         type: 'forfeit',
       }),
+    tradeCards: (command) =>
+      run((game) => tradeCardsCommand(game, command), command),
     resetGame: () =>
       set({ gameState: undefined, error: undefined, gameLog: [] }),
     clearError: () => set({ error: undefined }),

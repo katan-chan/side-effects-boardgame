@@ -120,5 +120,10 @@ export function describeCommand(
       })
     case 'endTurn':
       return t('logEndTurn', { player: actorPlayerName })
+    case 'tradeCards':
+      return t('logTrade', {
+        player: em(playerName(before, command.initiatorPlayerId)),
+        target: em(playerName(before, command.partnerPlayerId)),
+      })
   }
 }

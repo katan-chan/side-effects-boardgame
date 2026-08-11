@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import type { CSSProperties } from 'react'
 import type { CardInstance } from '../game/cards/types'
 import type { GameState, PlayerState } from '../game/engine/types'
 import type {
@@ -26,6 +27,13 @@ import { ChatDrawer } from './chat/ChatDrawer'
 import { useLocalChatBot } from './chat/useLocalChatBot'
 import { createMessageId } from './chat/messageId'
 import { useChatStore } from '../store/chatStore'
+import { useTradeStore } from '../store/tradeStore'
+import { TradeButton } from './trade/TradeButton'
+import { TradeInviteBadge } from './trade/TradeInviteBadge'
+import { TradePartnerPicker, type TradePartnerOption } from './trade/TradePartnerPicker'
+import { TradePanel } from './trade/TradePanel'
+import { useLocalTradeBot } from './trade/useLocalTradeBot'
+import { resolveTradeHandClick, isAwaitingTradeCard } from './trade/tradeHandPlacement'
 
 type BoardCard =
   | Pick<
@@ -59,6 +67,23 @@ interface GameBoardProps {
    *  socket. Absent in local mode, where GameBoard appends straight to
    *  chatStore instead and a bot fakes the other hot-seat players. */
   onSendChat?: (text: string) => void
+  /** Same online-mode idiom as onSendChat: presence of these seven callbacks
+   *  is what turns on the trade UI. In online mode they call the socket; in
+   *  local hot-seat they drive `localTradeDriver` instead, with a bot
+   *  (`useLocalTradeBot`) playing the other side — either way GameBoard
+   *  only ever sees the same seven functions. */
+  onInviteTrade?: (targetPlayerId: string) => void
+  onAcceptTrade?: () => void
+  onDeclineTrade?: () => void
+  onPlaceTradeCard?: (cardInstanceId: string) => void
+  onClearTradeCard?: () => void
+  onConfirmTrade?: () => void
+  onCancelTrade?: () => void
+  /** Per-player reason a trade invite would be rejected, supplied by the
+   *  online wiring layer (room connectivity / other active sessions). Absent
+   *  or missing entries are treated as eligible; `tradeUsedThisTurn` is
+   *  always known locally from `game.players` and needs no entry here. */
+  tradeIneligiblePlayers?: Record<string, 'busy' | 'disconnected'>
   onDiscard: (cardId: string) => void
   onManualDiscard: (cardId: string) => void
   onPlayDrug: (drugId: string, disorderId: string) => void
@@ -150,16 +175,21 @@ export function Psyche({
 function CardButton({
   card,
   selected,
+  tradePlaced,
   onClick,
 }: {
   card: BoardCard
   selected: boolean
+  /** This card is the one currently offered in an open trade session — see
+   *  tradeHandPlacement.ts. Purely a visual marker; clicking it still goes
+   *  through the same handler, which is what takes it back out. */
+  tradePlaced?: boolean
   onClick: () => void
 }) {
   return (
     <button
       type="button"
-      className={`card-button ${selected ? 'selected' : ''}`}
+      className={`card-button ${selected ? 'selected' : ''} ${tradePlaced ? 'trade-placed' : ''}`}
         onClick={(event) => {
           event.stopPropagation()
           onClick()
@@ -167,6 +197,7 @@ function CardButton({
       }}
     >
       <GameCard card={card} />
+      {tradePlaced && <span className="trade-placed-badge">🔁 Đang đổi</span>}
     </button>
   )
 }
@@ -188,6 +219,20 @@ export function GameBoard(props: GameBoardProps) {
   const [showChat, setShowChat] = useState(false)
   const [isLocked, setIsLocked] = useState(false) // Lock interactions while waiting for server
   const [sortMode, setSortMode] = useState<'original' | 'type' | 'name'>('original')
+
+  // Trade UI mounts in both modes now: online wires these seven callbacks to
+  // the socket, local wires them to localTradeDriver — GameBoard can't tell
+  // the difference and doesn't need to.
+  const isTradeEnabled = Boolean(props.onInviteTrade)
+  // Read-only: GameBoard only ever looks at the session to decide what a
+  // hand click means (tradeHandPlacement.ts) and to show the "place a card"
+  // hint. It never writes to this store — that stays server-mirrored state.
+  const tradeSession = useTradeStore((state) => state.session)
+  const isAwaitingTradeCardPlacement = isTradeEnabled && isAwaitingTradeCard(tradeSession)
+  const tradePlayers = useMemo(
+    () => game.players.map((player) => ({ id: player.id, name: player.name })),
+    [game.players],
+  )
 
   const isOnlineChat = Boolean(props.onSendChat)
   const isChatCollapsed = useChatStore((state) => state.isCollapsed)
@@ -215,6 +260,15 @@ export function GameBoard(props: GameBoardProps) {
     excludeId: viewer.id,
     isFinished: game.status === 'finished',
   })
+  // Local hot-seat has no real trade partner either: whichever player is
+  // invited is played by a bot (see useLocalTradeBot / localTradeBot.ts)
+  // instead of handing the device to a second human. Same online/local
+  // split as the chat bot above — never runs when onSendChat (online) is
+  // present.
+  useLocalTradeBot({
+    enabled: isTradeEnabled && !isOnlineChat,
+    isFinished: game.status === 'finished',
+  })
 
   useGameAudio(game as PlayerGameView, viewer.id)
 
@@ -233,6 +287,21 @@ export function GameBoard(props: GameBoardProps) {
   const isTargetingMode = selectedCard !== undefined
 
   const opponents = game.players.filter((player) => player.id !== viewer.id)
+  const tradePartners: TradePartnerOption[] = useMemo(
+    () =>
+      opponents.map((opponent) => {
+        const usedTurn = 'tradeUsedThisTurn' in opponent && opponent.tradeUsedThisTurn
+        const reason = usedTurn
+          ? 'đã đổi lượt này'
+          : props.tradeIneligiblePlayers?.[opponent.id] === 'busy'
+            ? 'đang bận'
+            : props.tradeIneligiblePlayers?.[opponent.id] === 'disconnected'
+              ? 'mất kết nối'
+              : undefined
+        return { id: opponent.id, name: opponent.name, reason }
+      }),
+    [opponents, props.tradeIneligiblePlayers],
+  )
   const focusedOpponent =
     opponents.find((player) => player.id === focusedOpponentId) ??
     opponents.find((player) => player.id === game.currentPlayerId) ??
@@ -257,6 +326,18 @@ export function GameBoard(props: GameBoardProps) {
       ? focusedOpponent.handCount
       : (focusedOpponent.hand?.length ?? 0)
     : 0
+  // --slot-count for the board's card-size fit (layout.css --card-w-fit-psyche):
+  // the two psyche rows actually on screen are the viewer's own (self-zone)
+  // and the focused opponent's (opponent-zone) — never every player's, since
+  // only those two ever render at once. Slot counts grow as disorders land,
+  // so this reads live state each render rather than a hardcoded max; the
+  // Math.max(1, …) floor keeps the CSS calc's division safe before either
+  // side has any slots yet.
+  const slotCount = Math.max(
+    1,
+    slotsOf(viewer).length,
+    focusedOpponent ? slotsOf(focusedOpponent).length : 0,
+  )
 
   useEffect(() => {
     // Unlock interaction when game state changes (server responded)
@@ -332,6 +413,13 @@ export function GameBoard(props: GameBoardProps) {
     <main
       className={`game-board ${isTargetingMode ? 'targeting-mode' : ''} ${isLocked ? 'interaction-locked' : ''} has-chat ${isChatCollapsed ? 'chat-collapsed' : ''}`}
       onClick={handleBackgroundClick}
+      /* --card-w (layout.css) is computed on .game-board itself, so the live
+         counts its fit formula reads have to land here too, not on .own-hand
+         (--hand-count used to live there, back when only the hand shrank to
+         fit) — :root and .own-hand are both the wrong element now: :root
+         can't see anything set on a descendant, and .own-hand can't see
+         .psyche's slot count. */
+      style={{ '--hand-count': sortedHand.length, '--slot-count': slotCount } as CSSProperties}
     >
       <PlayerSidebar
         player={viewer}
@@ -526,10 +614,18 @@ export function GameBoard(props: GameBoardProps) {
               ✖ {t('cancel')}
             </button>
           )}
-          <section className="hand own-hand" id="own-hand">
+          <section
+            className="hand own-hand"
+            id="own-hand"
+          >
             {selectedTreatment?.cardType === 'drug' && (
               <div className="selection-hint">
                 Thuốc này chữa được: <strong>{disorderName(selectedTreatment.treats)}</strong>
+              </div>
+            )}
+            {isAwaitingTradeCardPlacement && (
+              <div className="selection-hint trade-hint">
+                Chọn 1 lá trên tay để đưa vào giao dịch trao đổi
               </div>
             )}
             <div className="cards">
@@ -538,8 +634,20 @@ export function GameBoard(props: GameBoardProps) {
                   <CardButton
                     card={card}
                     selected={card.instanceId === selectedCardId}
+                    tradePlaced={isTradeEnabled && tradeSession?.phase === 'open' && tradeSession.yourCardId === card.instanceId}
                     onClick={() => {
                       audioManager.play('click')
+                      const tradeAction = isTradeEnabled
+                        ? resolveTradeHandClick(tradeSession, card.instanceId)
+                        : 'select'
+                      if (tradeAction === 'clear') {
+                        props.onClearTradeCard!()
+                        return
+                      }
+                      if (tradeAction === 'place') {
+                        props.onPlaceTradeCard!(card.instanceId)
+                        return
+                      }
                       if (selectedCardId === card.instanceId) setSelectedCardId(undefined)
                       else setSelectedCardId(card.instanceId)
                     }}
@@ -558,6 +666,16 @@ export function GameBoard(props: GameBoardProps) {
             >
               {sortMode === 'original' ? 'Sắp xếp' : sortMode === 'type' ? 'Theo loại' : 'Theo tên'}
             </button>
+            {isTradeEnabled && (
+              <>
+                <TradeButton players={tradePlayers} onCancelInvite={props.onCancelTrade!} />
+                <TradeInviteBadge
+                  players={tradePlayers}
+                  onAccept={props.onAcceptTrade!}
+                  onDecline={props.onDeclineTrade!}
+                />
+              </>
+            )}
             {isTargetingMode && isViewerTurn && game.turn.phase === 'play' && (
               <button
                 type="button"
@@ -608,6 +726,18 @@ export function GameBoard(props: GameBoardProps) {
         />
       )}
       <GhostLayer />
+      {isTradeEnabled && (
+        <>
+          <TradePartnerPicker partners={tradePartners} onInvite={props.onInviteTrade!} />
+          <TradePanel
+            players={tradePlayers}
+            hand={viewerHand}
+            onClear={props.onClearTradeCard!}
+            onConfirm={props.onConfirmTrade!}
+            onCancel={props.onCancelTrade!}
+          />
+        </>
+      )}
     </main>
   )
 }
