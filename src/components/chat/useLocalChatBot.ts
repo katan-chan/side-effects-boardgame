@@ -29,7 +29,7 @@ export function useLocalChatBot(options: {
   const append = useChatStore((state) => state.append)
   // Refs, not state: a timer id is bookkeeping for cleanup, not something a
   // render should ever depend on.
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>()
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const playersRef = useRef(players)
   playersRef.current = players
   const excludeIdRef = useRef(excludeId)
