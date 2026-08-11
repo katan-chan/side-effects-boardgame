@@ -26,7 +26,7 @@ export function PlayerSidebar({
   gameLog,
 }: PlayerSidebarProps) {
   return (
-    <aside className="player-sidebar">
+    <aside className="player-sidebar panel-surface panel-surface--framed">
       <SelfStatusPanel
         player={player}
         isViewerTurn={isViewerTurn}

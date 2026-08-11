@@ -46,7 +46,11 @@ export function SelfStatusPanel({
           {isViewerTurn ? t('yourTurn') : t('waitingFor', { player: currentPlayerName })}
         </strong>
         <span className="self-turn-meta">
-          {phaseName(phase)} · {cardsPlayedThisTurn}/2 thẻ · {t('turn')} {turnNumber}
+          {phaseName(phase)} ·{' '}
+          <span className="self-turn-meta-unit">
+            {cardsPlayedThisTurn}/2 thẻ
+          </span>{' '}
+          · <span className="self-turn-meta-unit">{t('turn')} {turnNumber}</span>
         </span>
       </div>
 

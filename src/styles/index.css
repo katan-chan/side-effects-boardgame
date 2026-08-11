@@ -15,6 +15,7 @@
 @import './screens/lobby.css';
 @import './screens/finished.css';
 @import './board/layout.css';
+@import './board/panel-surface.css';
 @import './board/sidebar.css';
 @import './board/chat.css';
 @import './board/psyche.css';
