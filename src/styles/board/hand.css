@@ -32,6 +32,15 @@
   margin-top: calc(var(--card-h) * -0.3);
 }
 .own-hand::-webkit-scrollbar { display: none; }
+/* The hand used to carry its own live-count fit here, overriding --card-w
+   (and re-deriving --card-h/--card-radius/the font tokens/--hand-gap on top
+   of it, because a custom property resolves its own var()s where it's
+   declared and a descendant that doesn't redeclare it just inherits the
+   frozen number). --card-w is now fit to BOTH this row and .psyche's live
+   counts in one place, on .game-board itself (layout.css's
+   --card-w-fit-hand, in the same `min-width: 801px` block this override used
+   to be scoped to) — so nothing downstream of it is ever stale, and this
+   whole block is gone rather than fixed. */
 .own-hand .cards {
   display: flex;
   flex-wrap: nowrap;
@@ -50,19 +59,69 @@
   z-index: calc(var(--z-selected) + 1);
   box-shadow: 0 0 0 4px var(--teal), 0 14px 22px #0009;
 }
+/* Absolute, anchored to .deck-area (layout.css), not .center-zone itself —
+   .center-zone sizes to minmax(var(--card-back-h), 1fr) and then CENTRES
+   .deck-area inside that box (flex, align-items/justify-content: center), so
+   the real gap against the opponent psyche row above is the slack that
+   centring leaves above .deck-area, not .center-zone's own much smaller
+   padding (--zone-pad). Anchoring to .center-zone's edge instead was tried
+   first and measured flush against .psyche at some sizes — the padding
+   alone isn't the real budget. GameBoard.tsx renders this block as a direct
+   child of .deck-area (moved there from .own-hand) so `bottom: 100%` below
+   means .deck-area's own top edge specifically. Because that edge is
+   wherever vertical centring puts it — auto opponent row above, auto self
+   row below and desktop's 1fr slack splits evenly above/below the deck by
+   construction, and mobile's fixed 12svh row centres the same way — this
+   tracks the true gap at any size with no vh guess to re-measure when card
+   sizing changes. The -0.4rem is breathing room, not a fit constant:
+   shrinking or dropping it only tightens/loosens the gap against the psyche
+   row, it doesn't relocate the anchor. Being absolute and out of flow, it
+   never reflows the deck or hand when it appears — confirmed by comparing
+   the deck piles' rects with the hint shown vs `display:none`, selection
+   still active. Short viewports (below ~820px tall) leave too little slack
+   above .deck-area for this at full size — see responsive.css's short-but-
+   wide block, which shrinks the hint itself there rather than moving the
+   anchor. */
 .selection-hint {
   position: absolute;
-  bottom: calc(100% + 0.35rem);
+  bottom: 100%;
   left: 50%;
-  transform: translateX(-50%);
+  /* --hint-gap, not a bare length: a local token so the mobile override
+     below can retune it without repeating this whole transform. */
+  transform: translate(-50%, calc(-1 * var(--hint-gap, 0.2rem)));
   z-index: var(--z-selected);
-  white-space: nowrap;
-  padding: 0.35rem 0.65rem;
+  /* width:max-content, not the auto default — with only `left` (not `right`)
+     set, a fixed box with width:auto shrink-to-fits against the space to the
+     RIGHT of that left offset only (half the viewport, here), not against
+     max-width, so it wrapped far tighter than max-width allowed and asymmetric-
+     ally besides. width:max-content sizes from the content instead and lets
+     max-width do the only capping, which is what centering via
+     transform:translateX(-50%) assumes. */
+  width: max-content;
+  /* Long enough for the wordier per-card-type hints to stay on one line at
+     desktop widths, capped so it can never reach the sidebars; below that it
+     wraps (no white-space:nowrap) rather than spilling past max-width. */
+  max-width: min(90vw, 32rem);
+  text-align: center;
+  /* Compact by default, not just at short viewports: the slack this anchors
+     into (the gap .deck-area's vertical centring leaves above it, inside
+     .center-zone's minmax(var(--card-back-h), 1fr) row — see the comment at
+     this block's render site in GameBoard.tsx) moves with live
+     --hand-count/--slot-count as much as with viewport size, so it can be
+     thin even on a tall desktop with a fuller hand and psyche than whatever
+     state happened to be on screen while measuring one breakpoint. Sizing
+     the box small everywhere it's legible rather than only in one measured
+     bucket is what keeps it out of .psyche across that live range instead of
+     only at the specific counts a breakpoint override was tuned against —
+     the mobile block below still grows it back where width, not this
+     vertical gap, is the binding constraint. */
+  line-height: 1.15;
+  padding: 0.12rem 0.4rem;
   border: 1px solid rgba(234, 179, 8, 0.55);
   border-radius: 999px;
   background: rgba(66, 46, 4, 0.94);
   color: #fde68a;
-  font-size: 0.72rem;
+  font-size: 0.52rem;
 }
 
 /* The right gutter (--controls-space) is narrower than the two buttons

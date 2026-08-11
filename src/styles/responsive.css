@@ -19,12 +19,27 @@
   /* Phones are width-bound, not height-bound: retune the knob, keep every
      derived dimension. Slots drop the drug-overlay margin to save width. */
   :root {
-    --card-w:      clamp(4.4rem, 22vw, 8rem);
-    --slot-w:      var(--card-w);
-    --board-gap:   0.5rem;
-    --zone-pad:    0.6rem;
-    --zone-chrome: 3rem;
+    /* --card-w-cap, not --card-w: the fit formula (layout.css) only runs
+       from 801px up, so on mobile .game-board's --card-w falls through to
+       clamp(floor, cap, ceiling) unchanged — same result as before, just
+       through the shared knob instead of a direct override. --card-w-cap
+       is the raw viewport term only (22vw) — the floor and ceiling that
+       used to be baked into this one clamp() are now the separate
+       --card-w-floor/--card-w-ceiling tokens .game-board's own clamp()
+       applies, so both need overriding here too or mobile inherits
+       desktop's (5rem / 13rem), not this device class's (4.4rem / 8rem). */
+    --card-w-floor:   4.4rem;
+    --card-w-cap:     22vw;
+    --card-w-ceiling: 8rem;
+    --board-gap:      0.5rem;
+    --zone-pad:       0.6rem;
+    --zone-chrome:    3rem;
   }
+  /* --card-w itself lives on .game-board now (layout.css), not :root, so
+     anything computed from it has to target .game-board too, or var(--card-w)
+     here resolves against nothing (:root is --card-w's ancestor, not its
+     descendant). */
+  .game-board { --slot-w: var(--card-w); }
   /* Smaller cards need a smaller line budget so the summary still ends
      in an ellipsis well inside the card frame. */
   .game-board { --card-summary-lines: 3; }
@@ -33,8 +48,24 @@
   /* Same reasoning: the 💬 button + ChatDrawer replace this column on phones. */
   .chat-sidebar { display: none; }
   /* Row 1 gains the face-down opponent hand, so it takes a slice off the deck
-     and self rows rather than overflowing the clipped board. */
-  .game-board { height: 100svh; overflow: hidden; width: 100vw; grid-template-rows: 35svh 12svh 53svh; grid-template-columns: 1fr; }
+     and self rows rather than overflowing the clipped board. A bare 1fr (not
+     minmax(0, 1fr), the guard the desktop column already uses at 801px+ —
+     see layout.css) would still let a non-shrinking descendant's auto min
+     width inflate this track past the viewport; the explicit 0 floor is what
+     forces the row-level overflow-x:auto (.own-hand, .psyche, etc.) to be
+     the thing that absorbs any excess instead of the track itself. */
+  .game-board { height: 100svh; overflow: hidden; width: 100vw; grid-template-rows: 35svh 12svh 53svh; grid-template-columns: minmax(0, 1fr); }
+  /* .opponent-zone/.center-zone/.self-zone ask for grid-column: 2 unconditionally
+     (layout.css), which is fine above 801px where .game-board actually has a
+     second column. Down here the template above collapses to one explicit
+     column, but the zones still ask for column 2 — Grid dutifully invents an
+     implicit second column sized to their content (~394px) to satisfy that,
+     which starves the real 1fr track down to 0 and leaves the extra width for
+     .game-board's overflow: hidden to clip. Pulling them back onto the single
+     explicit column is what stops that implicit track from being created. */
+  .opponent-zone,
+  .center-zone,
+  .self-zone { grid-column: 1; }
   /* Online mode's wrapper (see layout.css .online-game) needs the same unit
      swap here, or the status-bar-plus-board overflow this breakpoint fixed
      for local mode comes right back for online mode on phones. */
@@ -48,7 +79,8 @@
   .opponent-avatar-bar { margin-right: 7rem; }
   .top-action-btn { font-size: 0.62rem; min-height: 1.9rem; padding: 0.3rem 0.4rem; }
 
-  :root { --facedown-w: calc(var(--card-w) * 0.42); }
+  /* Same --card-w-lives-on-.game-board reasoning as --slot-w above. */
+  .game-board { --facedown-w: calc(var(--card-w) * 0.42); }
   /* --controls-space is ~8.5rem: a gutter that wide would leave the cards no
      room on a phone, so the player rows stack instead of using side gutters. */
   .player { display: flex; flex-direction: column; align-items: stretch; gap: 0.25rem; }
@@ -83,7 +115,23 @@
   .own-hand .cards { padding: 0.5rem 1rem; justify-content: safe center; min-width: min-content; }
   .own-hand .card-button { scroll-snap-align: start; }
   .own-hand .card-button.selected { transform: translateY(calc(var(--card-h) * -0.13)) scale(1.05); }
-  .selection-hint { bottom: calc(100% + 0.15rem); font-size: 0.62rem; }
+  /* hand.css's anchor (.deck-area, `bottom: 100%` there) needs no override
+     here: mobile's three fixed svh rows (35/12/53, set on .game-board above
+     in this block) still centre .deck-area inside .center-zone's 12svh row
+     the same way desktop's auto/1fr row does, just resolved from svh instead
+     — the anchor itself is breakpoint-agnostic. Only the box's own footprint
+     still needs retuning for phone width/legibility, and it can afford to be
+     bigger than the compact desktop default (hand.css) because mobile's
+     centring slack measured generous (20px+) even with a full hand and
+     psyche, unlike some desktop sizes:
+     max-width is wider than hand.css's desktop cap on purpose: the longer
+     per-card-type hints wrap to 2-3 lines at 375px regardless, and a
+     narrower box only forces more of them — every extra wrapped line eats
+     into the (fixed, since the anchor pins the hint's bottom edge) headroom
+     against the opponent psyche row above it, so widen the box first and
+     accept wrapping second. Measured with the longest hint (Disorder, the
+     wordiest of the four) at 375×812. */
+  .selection-hint { max-width: min(94vw, 23rem); font-size: 0.62rem; padding: 0.3rem 0.55rem; }
 
   .setup-screen .panel, .online-lobby { width: 100%; border-radius: var(--radius) var(--radius) 0 0; }
   .winner-panel { border-radius: var(--radius); }
@@ -106,6 +154,23 @@
     --zone-pad:  0.4rem;
   }
   .hud-glass { padding: 0.25rem 0.8rem; margin-bottom: 0.25rem; }
+  /* No .selection-hint override here: an earlier version of this block
+     shrank the hint specifically for this bucket, but the gap it anchors
+     into (the slack .deck-area's centring leaves above it, inside
+     .center-zone's row) moves with live --hand-count/--slot-count as much
+     as with viewport height — it was measured tight at some sizes OUTSIDE
+     this max-height:820px bucket too (1500×850, a fuller hand/psyche). A
+     per-breakpoint override chases whichever size was on screen while
+     measuring one bucket, not the underlying cause, so hand.css makes the
+     compact sizing the default everywhere instead of scoping it here.
+     Verified by measurement (browser rects, not eyeballed): with this
+     block's --board-gap/--zone-pad actually taking effect (see the fixed
+     premature comment-close a few lines up in the mobile block, which had
+     silently dropped every rule after it, including this one and the two
+     buckets below, from the parsed stylesheet), .selection-hint clears the
+     opponent .psyche row by 14-30px across hand sizes 2-7 at both
+     1280x700 and 1366x768 — the two sizes that measured a 6-9px overlap
+     before that typo was fixed. No further tuning needed here. */
 }
 
 
@@ -116,12 +181,26 @@
    width, is the binding constraint on landscape phones. */
 @media (max-height: 620px) {
   :root {
-    --card-w:      clamp(3rem, min(6.5vw, 13.5vh), 5rem);
+    /* Floor drops with the knob too, so the fit formula (layout.css) still
+       has a legibility line to stop at on short viewports instead of
+       inheriting the taller default floor. Ceiling drops with it too (was
+       baked into this same clamp() before --card-w-ceiling existed as its
+       own token) — without overriding it here, .game-board's clamp would
+       fall through to the 13rem desktop ceiling on a screen this short. */
+    --card-w-floor:   3rem;
+    --card-w-cap:     min(6.5vw, 13.5vh);
+    --card-w-ceiling: 5rem;
+    --board-gap:      0.25rem;
+    --zone-pad:       0.25rem;
+  }
+  /* --card-w-dependent, so .game-board not :root — see the mobile block
+     above. --card-back-h and --facedown-h are not re-listed: both are
+     calc()'d from --card-back-w/--facedown-w on this same element
+     (layout.css), so they re-resolve on their own once those change here. */
+  .game-board {
     --slot-w:      calc(var(--card-w) * 1.1);
     --card-back-w: calc(var(--card-w) * 0.6);
     --facedown-w:  calc(var(--card-w) * 0.5);
-    --board-gap:   0.25rem;
-    --zone-pad:    0.25rem;
   }
   .opponent-header { font-size: 0.7rem; margin-bottom: 0.2rem; }
   /* Card is smallest at this breakpoint, so the summary's line budget
@@ -164,7 +243,17 @@
 
 /* ── Large desktops: use the extra room instead of leaving it empty ── */
 @media (min-width: 1600px) and (min-height: 900px) {
-  :root { --card-w: clamp(5rem, min(8.5vw, 12.4vh), 15rem); }
+  :root {
+    /* Floor is unchanged (still 5rem, the desktop default) — only the cap
+       and ceiling grow, so there's more room to use, not a smaller minimum. */
+    --card-w-cap:     min(8.5vw, 12.4vh);
+    --card-w-ceiling: 15rem;
+  }
   /* Larger cards can afford a bigger line budget for the summary text. */
   .game-board { --card-summary-lines: 8; }
+  /* No .selection-hint override needed here any more: the bigger
+     --card-w-ceiling above grows .center-zone itself along with the deck and
+     psyche rows, and hand.css's anchor (.center-zone's own top edge) moves
+     with it automatically — that used to require a second measured `top`
+     because the old anchor was a vh guess blind to --card-w-ceiling. */
 }

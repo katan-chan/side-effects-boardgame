@@ -9,6 +9,49 @@
      overflow:hidden here — clipping would hide a layout regression instead of
      showing it. */
   height: 100dvh;
+
+  /* ── The single card-size knob, computed once, right here ──
+     .game-board is the lowest common ancestor of every card on the board
+     (deck, both players' psyche rows, both hands) AND the element React
+     stamps --hand-count/--slot-count onto (GameBoard.tsx) — :root can't see
+     those (it's an ancestor), so --card-w has to live here, not in
+     tokens.css. Below 801px this reduces to the viewport/height cap alone:
+     the fit formula added in the media query further down assumes the
+     .player/.hand-and-controls side-gutter grid (--controls-space) and the
+     .player-sidebar/.chat-sidebar columns, none of which exist below 801px
+     (responsive.css switches them to plain flex columns and hides the
+     sidebars) — subtracting gutters that aren't there would starve the
+     cards for no reason on a phone, which is already width-bound and
+     deliberately scrolls instead (see .own-hand, hand.css). */
+  --card-w: clamp(var(--card-w-floor), var(--card-w-cap), var(--card-w-ceiling));
+
+  /* Everything below derives from --card-w alone, ON THIS ELEMENT — a media
+     query only ever needs to redeclare --card-w (or, for the odd case, one
+     of these) and the rest recomputes automatically, because calc() re-reads
+     var(--card-w) from .game-board's own current value every time, not a
+     frozen number inherited from somewhere else. That "frozen number" is
+     exactly the bug this file used to have via hand.css's .own-hand override
+     (deleted — see hand.css) and is why every one of these lives here now
+     instead of being spread across the files that consume them. */
+  --card-h:       calc(var(--card-w) * var(--card-ratio));
+  --card-radius:  max(0.5rem, calc(var(--card-w) * 0.1));
+  --slot-w:       calc(var(--card-w) * 1.45);         /* card plus room for the drug overlay */
+  --hand-gap:     clamp(0.3rem, calc(var(--card-w) * 0.08), 1rem);
+  --card-back-w:  calc(var(--card-w) * 0.82);
+  --card-back-h:  calc(var(--card-back-w) * 1.4);
+  --card-title-fs:   max(0.6rem, calc(var(--card-w) * 0.092));
+  --card-summary-fs: max(0.53rem, calc(var(--card-w) * 0.075));
+  --card-micro-fs:   max(0.46rem, calc(var(--card-w) * 0.064));
+  /* Opponent's face-down hand (opponent-hand.css) — that file's own :root
+     default (declared before this refactor, out of scope to edit here) reads
+     var(--card-w) too, and :root can no longer see it, so it would resolve
+     to nothing for every viewport responsive.css doesn't already override.
+     Redeclaring the same default here, on .game-board, is what makes it
+     resolve correctly again — the nearer ancestor's value wins over :root's
+     for any descendant (.facedown-card) that doesn't set its own. */
+  --facedown-w:   calc(var(--card-w) * 0.72);
+  --facedown-h:   calc(var(--facedown-w) * var(--card-ratio));
+
   display: grid;
   /* Row 1 takes exactly what the opponent zone needs (its content is bounded:
      one row of cards plus an optional avatar bar), row 2 is the deck, and the
@@ -33,10 +76,78 @@
 }
 /* --chat-w defaults to --sidebar-w (see chat.css) so the two wings are
    symmetric out of the box; .chat-collapsed there overrides it to a narrow
-   rail without touching this rule. */
-.game-board.has-chat {
-  grid-template-columns: var(--sidebar-w) minmax(0, 1fr) var(--chat-w);
+   rail without touching this rule.
+   Scoped to the same 801px floor responsive.css's mobile block uses below —
+   media queries carry no specificity of their own, so an unconditional
+   two-class rule like this one (0,2,0) silently outranks `.game-board`'s
+   single-class mobile override (0,1,0) no matter which media query either
+   sits in, collapsing the middle column to 0 on phones. Fixing this by
+   narrowing the rule's scope, rather than by raising specificity on the
+   mobile side (or reaching for !important), is deliberate: matching
+   specificity upward is the arms race that produced this bug, and the next
+   rule added to either file would walk straight into it again. */
+@media (min-width: 801px) {
+  .game-board.has-chat {
+    grid-template-columns: var(--sidebar-w) minmax(0, 1fr) var(--chat-w);
+  }
 }
+
+/* ── Fit --card-w to what the board column actually has, not just the
+   viewport ──
+   Below 801px .player/.hand-and-controls drop --controls-space's side-gutter
+   grid for a plain flex column and the sidebars are display:none
+   (responsive.css), so the subtraction below would describe a layout that
+   doesn't exist there — same reason hand.css's old override was scoped to
+   this exact breakpoint. Above it, both rows sit inside the same middle grid
+   column: .opponent-zone/.self-zone (padding: --zone-pad) contain .player,
+   whose own grid-template-columns is --controls-space / 1fr / --controls-space
+   (layout.css .player rule) — .hand-and-controls repeats that same shape.
+   So one width, --board-avail-w, is what both rows' middle column actually
+   gets: the viewport minus both sidebars and both gutters. */
+@media (min-width: 801px) {
+  .game-board {
+    --board-avail-w: calc(
+      100vw - var(--sidebar-w) - var(--chat-w) -
+      (var(--controls-space) * 2) - (var(--zone-pad) * 2)
+    );
+    /* Hand row demand: N cards at card_w plus (N-1) gaps at --hand-gap
+       (tokens.css: clamp(0.3rem, card_w*0.08, 1rem)) — at the widths this fit
+       resolves to, that clamp sits on its middle branch, so gap ≈ 0.08·w and
+         demand = N·w + (N-1)·0.08w = w·(1.08N − 0.08)
+       plus .own-hand .cards's own 1rem horizontal padding (hand.css), which
+       is a flat width cost specific to that row's markup, not part of
+       --board-avail-w (psyche has no equivalent). Solving demand = avail − 1rem
+       for w gives the fit below. a = 1.08N − 0.08, b = 1rem. */
+    --card-w-fit-hand: calc(
+      (var(--board-avail-w) - 1rem) / (1.08 * var(--hand-count, 6) - 0.08)
+    );
+    /* Psyche row demand: N slots at --slot-w (card_w * 1.45) plus (N-1) gaps
+       at --board-gap — an ABSOLUTE length, unlike the hand's proportional
+       gap, so it's a flat cost rather than folding into the coefficient:
+         demand = 1.45N·w + (N-1)·board-gap
+       Solving demand = avail for w: a = 1.45N, b = (N-1)·board-gap. N is the
+       larger of the two psyche rows actually on screen (viewer + focused
+       opponent — GameBoard.tsx sets --slot-count from live state, since slot
+       counts grow during play and a hardcoded max would under- or
+       over-shrink depending which side of it the real game is on). */
+    --card-w-fit-psyche: calc(
+      (var(--board-avail-w) - (var(--slot-count, 4) - 1) * var(--board-gap))
+      / (1.45 * var(--slot-count, 4))
+    );
+    /* The knob: smallest of the height/viewport cap and both rows' fits,
+       never below the legibility floor, never above the flat ceiling. If the
+       floor wins here, a row's own fit could still be smaller than the
+       floor it was just clamped up to — that row is then wider than its
+       track and must scroll (its own overflow-x:auto), not wrap: see
+       .psyche/.own-hand for the fallback each row degrades to. */
+    --card-w: clamp(
+      var(--card-w-floor),
+      min(var(--card-w-cap), var(--card-w-fit-hand), var(--card-w-fit-psyche)),
+      var(--card-w-ceiling)
+    );
+  }
+}
+
 .game-board.interaction-locked { pointer-events: none; }
 .game-board.targeting-mode .opponent-zone,
 .game-board.targeting-mode .self-zone { background: rgba(0,0,0,.15); transition: background 0.2s; }
@@ -205,6 +316,15 @@
   justify-content: center;
   align-items: center;
   perspective: 1000px;
+  /* Containing block for .selection-hint (hand.css) — it needs to measure the
+     slack .center-zone's vertical centring leaves ABOVE the actual card row,
+     not .center-zone's own (much smaller) padding. See GameBoard.tsx's
+     comment at the hint's render site for why .center-zone itself isn't the
+     anchor. The hint is absolutely positioned, so this doesn't change
+     .draw-pile/.discard-pile's own layout or hover transforms — they aren't
+     positioned and don't participate in a containing-block relationship
+     with it. */
+  position: relative;
 }
 .draw-pile {
   position: relative;

@@ -55,26 +55,31 @@
 
   /* ── Adaptive board scale ──
      Card width is the single knob: every board dimension derives from it.
-     min(vw, vh) keeps the three board rows inside one screen on short
-     laptops while still growing on large desktops. Override --card-w in a
-     media query to retune a whole device class. */
-  --card-w:       clamp(5rem, min(9vw, 12.4vh), 13rem);
+     But :root is an ANCESTOR of .game-board, and .game-board is where the
+     live --hand-count/--slot-count land (set from React state — see
+     GameBoard.tsx) — a :root rule can never see a descendant's custom
+     property, so --card-w itself, and everything calc()'d from it, is
+     computed on .game-board instead (layout.css). Only the pieces that do
+     NOT depend on the live counts stay here as plain constants:
+       --card-w-floor / --card-w-cap / --card-w-ceiling — the legibility
+         floor, the viewport/height cap, and the flat maximum. --card-w-cap
+         is renamed from --card-w-base: it is now one of three inputs
+         .game-board's --card-w picks the smallest of, not the value itself.
+         min(vw, vh) keeps the three board rows inside one screen on short
+         laptops while still growing on large desktops. Retune any of the
+         three in a media query to retune a whole device class — see
+         responsive.css — never --card-w directly.
+       --card-ratio, --board-gap, --zone-pad, --zone-chrome, --controls-space
+         — geometry that --card-w's fit formulas read but that never itself
+         depends on --card-w. */
+  --card-w-floor:   5rem;
+  --card-w-cap:     min(9vw, 12.4vh);
+  --card-w-ceiling: 13rem;
   --card-ratio:   1.353;                              /* 11.5 / 8.5 — original card proportion */
-  --card-h:       calc(var(--card-w) * var(--card-ratio));
-  --card-radius:  max(0.5rem, calc(var(--card-w) * 0.1));
-  --slot-w:       calc(var(--card-w) * 1.45);         /* card plus room for the drug overlay */
   --board-gap:    clamp(0.4rem, 1.1vh, 1rem);
   --zone-pad:     clamp(0.5rem, 1.4vh, 1rem);
   --zone-chrome:  clamp(3rem, 7vh, 5.5rem);           /* badges, nameplate, avatar bar */
-  --hand-gap:     clamp(0.3rem, calc(var(--card-w) * 0.08), 1rem);
   /* Symmetric side gutters that keep the board's card rows centred: the right
      one holds the turn controls, the left one holds the player's name. */
   --controls-space: clamp(8.5rem, 12vw, 13rem);
-  --card-back-w:  calc(var(--card-w) * 0.82);
-  --card-back-h:  calc(var(--card-back-w) * 1.4);
-
-  /* Card typography scales with the card, with a legibility floor. */
-  --card-title-fs:   max(0.6rem, calc(var(--card-w) * 0.092));
-  --card-summary-fs: max(0.53rem, calc(var(--card-w) * 0.075));
-  --card-micro-fs:   max(0.46rem, calc(var(--card-w) * 0.064));
 }

@@ -53,6 +53,16 @@ function handOf(player: BoardPlayer): BoardCard[] {
   return player.hand ?? []
 }
 
+/** t() only returns plain text, so wrapping the interpolated value in <strong>
+ * afterwards means re-finding it in the resolved string — splits around the
+ * first occurrence of `value` rather than the raw `{param}` token, which t()
+ * has already replaced by the time this runs. */
+function splitAroundValue(text: string, value: string): [string, string] {
+  const index = text.indexOf(value)
+  if (index === -1) return [text, '']
+  return [text.slice(0, index), text.slice(index + value.length)]
+}
+
 interface GameBoardProps {
   game: GameState | PlayerGameView
   viewerPlayerId?: string
@@ -275,6 +285,15 @@ export function GameBoard(props: GameBoardProps) {
   const selectedCard = viewerHand.find((card) => card.instanceId === selectedCardId)
   const selectedTreatment = selectedCard?.cardType === 'drug'
     ? getCardDefinition(selectedCard.definitionId)
+    : undefined
+  // Only the Drug hint interpolates a value, so only it needs the split-and-
+  // rewrap dance (splitAroundValue) to keep <strong> around the Disorder name;
+  // the other card types' hints below are static one-liners straight from t().
+  const treatedDisorderName = selectedTreatment?.cardType === 'drug'
+    ? disorderName(selectedTreatment.treats)
+    : undefined
+  const drugHintParts = treatedDisorderName
+    ? splitAroundValue(t('selectionHintDrug', { disorder: treatedDisorderName }), treatedDisorderName)
     : undefined
   const sortedHand = useMemo(() => {
     if (sortMode === 'original') return viewerHand
@@ -536,6 +555,39 @@ export function GameBoard(props: GameBoardProps) {
 
       <section className="center-zone" id="center-table">
         <div className="deck-area">
+          {/* Hints render here, not inside .own-hand: .deck-area is the
+              actual card row, centred inside .center-zone's row 2 (the
+              minmax(var(--card-back-h), 1fr) track, layout.css) rather than
+              filling it — so the slack ABOVE .deck-area, not .center-zone's
+              own (much smaller) padding, is the real gap to the opponent
+              psyche row above. Anchoring an absolutely-positioned child to
+              .center-zone's own edge instead of here was tried first and
+              landed the hint flush against .psyche at some sizes (only
+              zone-pad's few px of slack was available, not the vertical-
+              centring slack) — anchoring to .deck-area gets the whole gap
+              without any viewport math, at every breakpoint. See hand.css
+              for the anchor itself. Moved together as a block so the trade
+              hint (in-progress feature, left untouched below) keeps
+              rendering with the rest. */}
+          {selectedTreatment?.cardType === 'drug' && drugHintParts && (
+            <div className="selection-hint">
+              {drugHintParts[0]}<strong>{treatedDisorderName}</strong>{drugHintParts[1]}
+            </div>
+          )}
+          {selectedCard?.cardType === 'disorder' && (
+            <div className="selection-hint">{t('selectionHintDisorder')}</div>
+          )}
+          {selectedCard?.cardType === 'therapy' && (
+            <div className="selection-hint">{t('selectionHintTherapy')}</div>
+          )}
+          {selectedCard?.cardType === 'episode' && (
+            <div className="selection-hint">{t('selectionHintEpisode')}</div>
+          )}
+          {isAwaitingTradeCardPlacement && (
+            <div className="selection-hint trade-hint">
+              Chọn 1 lá trên tay để đưa vào giao dịch trao đổi
+            </div>
+          )}
           <button id="deck-draw" type="button" className="draw-pile" style={{ padding: 0, background: 'none', border: 'none' }} onClick={() => {
             if (!isLocked) {
               audioManager.play('draw')
@@ -618,16 +670,6 @@ export function GameBoard(props: GameBoardProps) {
             className="hand own-hand"
             id="own-hand"
           >
-            {selectedTreatment?.cardType === 'drug' && (
-              <div className="selection-hint">
-                Thuốc này chữa được: <strong>{disorderName(selectedTreatment.treats)}</strong>
-              </div>
-            )}
-            {isAwaitingTradeCardPlacement && (
-              <div className="selection-hint trade-hint">
-                Chọn 1 lá trên tay để đưa vào giao dịch trao đổi
-              </div>
-            )}
             <div className="cards">
               {sortedHand.map((card) => (
                 <div id={`hand-card-${card.instanceId}`} key={card.instanceId}>

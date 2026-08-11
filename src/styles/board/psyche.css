@@ -2,10 +2,23 @@
 .psyche {
   display: flex;
   gap: var(--board-gap);
-  justify-content: center;
-  flex-wrap: wrap;
+  /* safe center, not plain center: in a scroll container plain centring lets
+     overflow spill off BOTH edges, and the first slot becomes unreachable
+     (same reasoning as .own-hand, hand.css). */
+  justify-content: safe center;
+  /* --card-w-fit-psyche (layout.css) sizes cards so this row fits at its
+     live slot count, but that fit can be smaller than --card-w-floor —
+     the floor then wins the outer clamp, and the row is left wider than its
+     track. flex-wrap: wrap was the original bug here (four slots wrapping
+     into two visually-interleaved columns, the psyche row's height doubling
+     and pushing the deck row out from under 100dvh); nowrap + scroll is the
+     row's own fallback for that case, matching .own-hand's. */
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
   perspective: 1000px;
 }
+.psyche::-webkit-scrollbar { display: none; }
 .slot {
   position: relative;
   display: flex;
