@@ -59,29 +59,18 @@
   z-index: calc(var(--z-selected) + 1);
   box-shadow: 0 0 0 4px var(--teal), 0 14px 22px #0009;
 }
-/* Absolute, anchored to .deck-area (layout.css), not .center-zone itself —
-   .center-zone sizes to minmax(var(--card-back-h), 1fr) and then CENTRES
-   .deck-area inside that box (flex, align-items/justify-content: center), so
-   the real gap against the opponent psyche row above is the slack that
-   centring leaves above .deck-area, not .center-zone's own much smaller
-   padding (--zone-pad). Anchoring to .center-zone's edge instead was tried
-   first and measured flush against .psyche at some sizes — the padding
-   alone isn't the real budget. GameBoard.tsx renders this block as a direct
-   child of .deck-area (moved there from .own-hand) so `bottom: 100%` below
-   means .deck-area's own top edge specifically. Because that edge is
-   wherever vertical centring puts it — auto opponent row above, auto self
-   row below and desktop's 1fr slack splits evenly above/below the deck by
-   construction, and mobile's fixed 12svh row centres the same way — this
-   tracks the true gap at any size with no vh guess to re-measure when card
-   sizing changes. The -0.4rem is breathing room, not a fit constant:
-   shrinking or dropping it only tightens/loosens the gap against the psyche
-   row, it doesn't relocate the anchor. Being absolute and out of flow, it
-   never reflows the deck or hand when it appears — confirmed by comparing
-   the deck piles' rects with the hint shown vs `display:none`, selection
-   still active. Short viewports (below ~820px tall) leave too little slack
-   above .deck-area for this at full size — see responsive.css's short-but-
-   wide block, which shrinks the hint itself there rather than moving the
-   anchor. */
+/* Shared visual base for both the hand-anchored hint (.hand-selection-hint,
+   below) and the trade hint (trade.css's .trade-hint, still rendered as a
+   child of .deck-area in GameBoard.tsx). The position set here (position/
+   bottom/left/transform) is only the trade hint's now: it fires with NO
+   card selected (asking the player to pick one for the trade), so it has
+   nothing to anchor above and keeps the original centring against
+   .deck-area (layout.css's position:relative there). .hand-selection-hint
+   below overrides position/bottom/left/top/transform wholesale for the
+   anchored variant, which is portaled to document.body and positioned with
+   plain px left/top written by SelectionHint.tsx — same specificity as
+   this rule (one class each), so source order (declared after) decides,
+   not the other way around. */
 .selection-hint {
   position: absolute;
   bottom: 100%;
@@ -103,25 +92,48 @@
      wraps (no white-space:nowrap) rather than spilling past max-width. */
   max-width: min(90vw, 32rem);
   text-align: center;
-  /* Compact by default, not just at short viewports: the slack this anchors
-     into (the gap .deck-area's vertical centring leaves above it, inside
-     .center-zone's minmax(var(--card-back-h), 1fr) row — see the comment at
-     this block's render site in GameBoard.tsx) moves with live
-     --hand-count/--slot-count as much as with viewport size, so it can be
-     thin even on a tall desktop with a fuller hand and psyche than whatever
-     state happened to be on screen while measuring one breakpoint. Sizing
-     the box small everywhere it's legible rather than only in one measured
-     bucket is what keeps it out of .psyche across that live range instead of
-     only at the specific counts a breakpoint override was tuned against —
-     the mobile block below still grows it back where width, not this
-     vertical gap, is the binding constraint. */
   line-height: 1.15;
   padding: 0.12rem 0.4rem;
   border: 1px solid rgba(234, 179, 8, 0.55);
   border-radius: 999px;
   background: rgba(66, 46, 4, 0.94);
   color: #fde68a;
-  font-size: 0.52rem;
+  /* 0.52rem measured tiny even before accounting for the typeface: Cormorant
+     Garamond's x-height is 39/100 versus Segoe UI's 50/100 (measured), so
+     0.52rem here reads ~22% smaller than the same number would in a normal
+     sans face. 0.85rem is a ~63% jump — sized to be comfortably readable at
+     a glance (this is the pill telling the player which target/rule applies
+     to their current selection) while still fitting the portal's own
+     viewport clamp (SelectionHint.tsx measures this box's real rendered
+     width/height every time and re-centers/re-tops it against
+     window.innerWidth/innerHeight, so growth here is a measured input to
+     that clamp, not a fixed guess it could outgrow). */
+  font-size: 0.85rem;
+}
+/* Anchored to the selected card, not .deck-area: the drug/disorder/therapy/
+   episode hints always have a selected card in the hand to point at, so
+   they anchor to that card specifically instead of centring over the deck.
+   Rendered through a React portal into document.body (SelectionHint.tsx),
+   NOT as a child of .own-hand, so `position: fixed` here resolves against
+   the viewport rather than .own-hand's scrollable content box. That matters
+   because .own-hand has overflow-x:auto, which forces overflow-y:auto too —
+   anything positioned above .own-hand's own padding-top edge sits in
+   territory a scroll container can never reach (scrollTop can't go
+   negative), so a non-portaled hint anchored above the hand row would be
+   permanently clipped no matter how much padding-top .own-hand reserves.
+   `left`/`top` are plain px, written by SelectionHint.tsx from
+   getBoundingClientRect() measurements taken in viewport coordinates and
+   clamped against window.innerWidth/innerHeight (not against .own-hand's
+   own — much narrower — width, which is what the old CSS clamp() did and
+   is why the hint used to land 100px+ off-centre from the card). No
+   clamp()/translate(-50%) here any more: JS already computes the hint's
+   final top-left corner, so the base rule's centring transform and
+   percentage anchor would only double-offset it. */
+.hand-selection-hint {
+  position: fixed;
+  bottom: auto;
+  transform: none;
+  z-index: var(--z-drawer);
 }
 
 /* The right gutter (--controls-space) is narrower than the two buttons

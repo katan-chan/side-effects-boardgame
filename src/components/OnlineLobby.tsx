@@ -192,21 +192,15 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
 
   return (
     <main className="setup-screen">
-      <section className={`panel online-lobby${room ? ' has-chat' : ''}`}>
+      <section className={`panel online-lobby panel-surface panel-surface--framed${room ? ' has-chat' : ''}`}>
         <button
           type="button"
-          style={{ background: 'none', border: 'none', color: 'var(--text-faint)', fontSize: '0.82rem', fontWeight: 700, padding: '0.3rem 0', marginBottom: '1rem', minHeight: 'unset', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+          className="lobby-back-btn"
           onClick={onBack}
         >
           ← {t('back')}
         </button>
-        {/* .gradient-text is `display: inline-block` (base.css) for the
-            background-clip gradient trick. That's invisible on its own, but
-            here it sits right after the back button's inline-flex box, so
-            without a block override (.online-lobby h1 in lobby.css) the two
-            render on the same line with no gap — pre-existing, not caused by
-            the chat panel. */}
-        <h1 className="gradient-text" style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '1.4rem' }}>{t('onlineGame')}</h1>
+        <h1 className="online-lobby-title">{t('onlineGame')}</h1>
 
         {connectionState !== 'connected' && (
           <p className="error" style={{ marginBottom: '1rem' }}>
@@ -244,8 +238,7 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
               <span className="label">{t('roomCode')}</span>
               <div className="input-row">
                 <input
-                  className="field-input"
-                  style={{ textTransform: 'uppercase', letterSpacing: '0.2em', textAlign: 'center', fontWeight: 700 }}
+                  className="field-input room-code-input"
                   value={roomCode}
                   maxLength={6}
                   placeholder="ABC123"
@@ -253,7 +246,7 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
                 />
                 <button
                   type="button"
-                  style={{ flex: '0 0 auto', padding: '0 1.2rem', fontWeight: 800, background: 'linear-gradient(135deg, var(--green), #16a34a)', color: '#022c15', border: 'none', borderRadius: 'var(--radius-sm)' }}
+                  className="btn-join"
                   disabled={!displayName.trim() || !roomCode.trim()}
                   onClick={() => clientRef.current?.joinRoom(roomCode, displayName.trim())}
                 >
@@ -327,13 +320,13 @@ export function OnlineLobby({ onBack }: OnlineLobbyProps) {
                 </button>
               )}
               {!isHost && (
-                <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                <p className="waiting-host-msg">
                   {t('waitingForHost')}
                 </p>
               )}
               <button
                 type="button"
-                className="btn-danger"
+                className="btn-danger leave-room-btn"
                 onClick={() => clientRef.current?.leaveRoom()}
               >
                 Rời phòng

@@ -115,23 +115,38 @@
   .own-hand .cards { padding: 0.5rem 1rem; justify-content: safe center; min-width: min-content; }
   .own-hand .card-button { scroll-snap-align: start; }
   .own-hand .card-button.selected { transform: translateY(calc(var(--card-h) * -0.13)) scale(1.05); }
-  /* hand.css's anchor (.deck-area, `bottom: 100%` there) needs no override
-     here: mobile's three fixed svh rows (35/12/53, set on .game-board above
-     in this block) still centre .deck-area inside .center-zone's 12svh row
-     the same way desktop's auto/1fr row does, just resolved from svh instead
-     — the anchor itself is breakpoint-agnostic. Only the box's own footprint
-     still needs retuning for phone width/legibility, and it can afford to be
-     bigger than the compact desktop default (hand.css) because mobile's
-     centring slack measured generous (20px+) even with a full hand and
-     psyche, unlike some desktop sizes:
+  /* Two different .selection-hint variants live at this breakpoint, each
+     anchored differently — see hand.css / layout.css for the anchor
+     specifics.
+     - The trade hint still anchors to .deck-area (`bottom: 100%` there,
+       unchanged): mobile's three fixed svh rows (35/12/53, set on
+       .game-board above in this block) still centre .deck-area inside
+       .center-zone's 12svh row the same way desktop's auto/1fr row does,
+       just resolved from svh instead — the anchor itself is breakpoint-
+       agnostic, so no override is needed here for it.
+     - The drug/disorder/therapy/episode hints anchor to the selected card
+       instead (hand.css's .hand-selection-hint, portaled to document.body
+       and positioned with fixed px left/top computed in SelectionHint.tsx)
+       and don't depend on .deck-area, .center-zone, or .own-hand's box at
+       all.
+     Only the shared box's own footprint still needs retuning for phone
+     width/legibility, for both variants alike, and it can afford to be
+     bigger than the compact desktop default (hand.css):
      max-width is wider than hand.css's desktop cap on purpose: the longer
      per-card-type hints wrap to 2-3 lines at 375px regardless, and a
      narrower box only forces more of them — every extra wrapped line eats
-     into the (fixed, since the anchor pins the hint's bottom edge) headroom
-     against the opponent psyche row above it, so widen the box first and
-     accept wrapping second. Measured with the longest hint (Disorder, the
-     wordiest of the four) at 375×812. */
-  .selection-hint { max-width: min(94vw, 23rem); font-size: 0.62rem; padding: 0.3rem 0.55rem; }
+     into whichever headroom that variant has above it (the psyche-row gap
+     above .deck-area for the trade hint; SelectionHint.tsx's own 8px
+     viewport-top clamp for the other four, so wrapping taller just pushes
+     top further down rather than getting clipped), so widen the box first
+     and accept wrapping second. Measured with the longest hint (Disorder,
+     the wordiest of the four) at 375×812. */
+  /* font-size scaled up in step with hand.css's desktop base (0.52rem ->
+     0.85rem, a ~63% jump — see that rule's comment for why) so mobile's
+     hint doesn't end up relatively smaller than desktop's: this bucket's
+     original 0.62rem was already ~19% above the old 0.52rem base, so
+     0.85rem * 1.19 ≈ 1rem keeps that same relative bump. */
+  .selection-hint { max-width: min(94vw, 23rem); font-size: 1rem; padding: 0.3rem 0.55rem; }
 
   .setup-screen .panel, .online-lobby { width: 100%; border-radius: var(--radius) var(--radius) 0 0; }
   .winner-panel { border-radius: var(--radius); }
@@ -154,23 +169,32 @@
     --zone-pad:  0.4rem;
   }
   .hud-glass { padding: 0.25rem 0.8rem; margin-bottom: 0.25rem; }
-  /* No .selection-hint override here: an earlier version of this block
-     shrank the hint specifically for this bucket, but the gap it anchors
-     into (the slack .deck-area's centring leaves above it, inside
-     .center-zone's row) moves with live --hand-count/--slot-count as much
-     as with viewport height — it was measured tight at some sizes OUTSIDE
-     this max-height:820px bucket too (1500×850, a fuller hand/psyche). A
-     per-breakpoint override chases whichever size was on screen while
-     measuring one bucket, not the underlying cause, so hand.css makes the
-     compact sizing the default everywhere instead of scoping it here.
-     Verified by measurement (browser rects, not eyeballed): with this
-     block's --board-gap/--zone-pad actually taking effect (see the fixed
-     premature comment-close a few lines up in the mobile block, which had
-     silently dropped every rule after it, including this one and the two
-     buckets below, from the parsed stylesheet), .selection-hint clears the
-     opponent .psyche row by 14-30px across hand sizes 2-7 at both
-     1280x700 and 1366x768 — the two sizes that measured a 6-9px overlap
-     before that typo was fixed. No further tuning needed here. */
+  /* No .selection-hint override here for either variant, for two different
+     reasons:
+     - The trade hint (deck-area-anchored): an earlier version of this block
+       shrank the hint specifically for this bucket, but the gap it anchors
+       into (the slack .deck-area's centring leaves above it, inside
+       .center-zone's row) moves with live --hand-count/--slot-count as much
+       as with viewport height — it was measured tight at some sizes OUTSIDE
+       this max-height:820px bucket too (1500×850, a fuller hand/psyche). A
+       per-breakpoint override chases whichever size was on screen while
+       measuring one bucket, not the underlying cause, so hand.css makes the
+       compact sizing the default everywhere instead of scoping it here.
+       Verified by measurement (browser rects, not eyeballed): with this
+       block's --board-gap/--zone-pad actually taking effect (see the fixed
+       premature comment-close a few lines up in the mobile block, which had
+       silently dropped every rule after it, including this one and the two
+       buckets below, from the parsed stylesheet), .selection-hint (trade
+       hint) clears the opponent .psyche row by 14-30px across hand sizes
+       2-7 at both 1280x700 and 1366x768 — the two sizes that measured a
+       6-9px overlap before that typo was fixed. No further tuning needed
+       here.
+     - The drug/disorder/therapy/episode hints (.hand-selection-hint) never
+       depended on this gap in the first place — they're portaled to
+       document.body and positioned with fixed px top/left measured
+       straight off the selected card's own getBoundingClientRect() in
+       SelectionHint.tsx, so neither --board-gap/--zone-pad nor
+       --hand-count/--slot-count factor into their placement at all. */
 }
 
 
@@ -251,9 +275,16 @@
   }
   /* Larger cards can afford a bigger line budget for the summary text. */
   .game-board { --card-summary-lines: 8; }
-  /* No .selection-hint override needed here any more: the bigger
-     --card-w-ceiling above grows .center-zone itself along with the deck and
-     psyche rows, and hand.css's anchor (.center-zone's own top edge) moves
+  /* No .selection-hint override needed here for the trade hint any more:
+     the bigger --card-w-ceiling above grows .center-zone itself along with
+     the deck and psyche rows, and its anchor (.deck-area, hand.css) moves
      with it automatically — that used to require a second measured `top`
-     because the old anchor was a vh guess blind to --card-w-ceiling. */
+     because the old anchor was a vh guess blind to --card-w-ceiling.
+     The drug/disorder/therapy/episode hints don't need one either, for an
+     unrelated reason: they're positioned via SelectionHint.tsx's own
+     getBoundingClientRect() measurement of the selected card, re-run
+     through a ResizeObserver/scroll listener on #own-hand and a window
+     resize listener, so a bigger --card-w-ceiling here is just something
+     they measure and react to at runtime, not something CSS needs to chase
+     with a breakpoint override. */
 }

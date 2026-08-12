@@ -1,4 +1,5 @@
 /* PsycheWard — style entry point. Order matters: tokens first, media queries last. */
+@import './fonts.css';
 @import './tokens.css';
 @import './base.css';
 /* theme-art.css only overrides body/body::before (base.css) and is placed
@@ -17,6 +18,7 @@
 @import './board/layout.css';
 @import './board/panel-surface.css';
 @import './board/sidebar.css';
+@import './board/card-preview.css';
 @import './board/chat.css';
 @import './board/psyche.css';
 @import './board/cards.css';

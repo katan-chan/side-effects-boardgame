@@ -1,6 +1,7 @@
 import { t } from '../../i18n'
 import type { PlayerState } from '../../game/engine/types'
 import type { PlayerView } from '../../../server/game/playerView'
+import { CardInfoPanel } from './CardInfoPanel'
 import { SelfStatusPanel } from './SelfStatusPanel'
 import { GameLogList } from '../GameLogList'
 
@@ -27,6 +28,7 @@ export function PlayerSidebar({
 }: PlayerSidebarProps) {
   return (
     <aside className="player-sidebar panel-surface panel-surface--framed">
+      <CardInfoPanel />
       <SelfStatusPanel
         player={player}
         isViewerTurn={isViewerTurn}

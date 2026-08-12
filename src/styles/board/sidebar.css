@@ -291,7 +291,50 @@
    this width budget, the lever left is stroke weight, not size (there
    is no size headroom) and not --sidebar-fs-body (raising the body
    step was the point of the change that set these three steps). */
-.sidebar-heading {
+
+/* Scoped to `.panel-surface .sidebar-heading`, NOT bare `.sidebar-heading`:
+   this class name is not exclusive to this paper sidebar.
+   ChatPanel.tsx stamps it onto its own <h3 className="sidebar-heading
+   chat-panel-title">, and that panel is reused both in-game (chat-sidebar,
+   no .panel-surface ancestor) and in the online lobby (still no
+   .panel-surface ancestor) over a dark navy background. Measured live in
+   the lobby before this fix: this rule's near-black ink
+   (var(--panel-ink), #1a1006) and matching -webkit-text-stroke painted
+   on rgba(15, 23, 42, 0.8) at ~1.05:1 contrast — effectively invisible —
+   and the border-bottom read as a strikethrough over the (also
+   near-invisible) text. None of that is a bug in this rule's values;
+   it's the paper's ink, stroke, rule colour and type scale, and it
+   should only ever apply where the paper is. Scoping by *material*
+   (`.panel-surface`, the mixin that actually owns the parchment
+   background/ink contract — see the note on `.player-sidebar` above)
+   rather than by *location* (`.player-sidebar`) means this styling
+   follows the paper wherever it's later reused and can't leak onto a
+   non-paper ancestor again; a location-keyed selector would not have
+   prevented that (a future paper surface elsewhere in the app would
+   need this rule re-declared under its own location class instead of
+   just inheriting it here).
+   Audited every other selector in this file the same way — does the
+   class it's keyed on ever render outside `.panel-surface`?
+   `.self-avatar`, `.self-identity`, `.self-turn*`, `.self-episodes`,
+   `.episode-*`, `.sidebar-self`, `.self-head`, `.sidebar-log`,
+   `.game-log-list` and `.player-sidebar` itself each have exactly one
+   consumer (PlayerSidebar.tsx / SelfStatusPanel.tsx / GameLogList.tsx),
+   always nested inside the `player-sidebar panel-surface
+   panel-surface--framed` aside — none of them have a second call site,
+   so none of them leak today. `.sidebar-heading` was the only one with
+   a second consumer, and stays the only rule in this file that needs
+   material-scoping.
+   Specificity check: `.panel-surface .sidebar-heading` is (0,2,0), up
+   from bare `.sidebar-heading`'s (0,1,0). The two rules further down
+   that override pieces of this one — `.self-episodes .sidebar-heading`
+   and `.sidebar-log .sidebar-heading` — are already (0,2,0) themselves
+   and appear later in this file, so they still win on every overlapping
+   property by source order; this change doesn't flip who wins. Nothing
+   outside this file selects bare `.sidebar-heading` (chat.css only
+   targets `.chat-panel-title`/`.chat-panel-heading`, never this class),
+   so nothing else could have been depending on the old, lower
+   specificity either. */
+.panel-surface .sidebar-heading {
   font-size: var(--sidebar-fs-heading);
   font-variant: small-caps;
   letter-spacing: 0;

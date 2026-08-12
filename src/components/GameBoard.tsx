@@ -14,6 +14,8 @@ import { canReceiveDisorderInSlots, type ExposureSlot } from '../game/engine/sid
 import { canTreatWithTherapy } from '../game/engine/therapy'
 import { GameCard } from './cards/GameCard'
 import { CardBack } from './cards/CardBack'
+import { CardHoverProvider, useCardHover } from './cards/cardHoverContext'
+import { SelectionHint } from './board/SelectionHint'
 import { OpponentAvatarBar } from './OpponentAvatarBar'
 import { OpponentHand } from './OpponentHand'
 import { GameLogDrawer } from './GameLogDrawer'
@@ -196,6 +198,14 @@ function CardButton({
   tradePlaced?: boolean
   onClick: () => void
 }) {
+  // Keyboard-only path for the sidebar card-info preview (CardInfoPanel):
+  // hand cards are <button>s, and a button's own focus/blur never reaches a
+  // descendant handler (GameCard's internal hover span, cardHoverContext.tsx,
+  // only ever sees mouseenter/mouseleave) — so this is wired here instead,
+  // on the actual focusable element. Safe the same way GameCard's own
+  // wiring is: `card` here is always one of the viewer's own real hand
+  // cards, never a face-down one.
+  const { onCardHover } = useCardHover()
   return (
     <button
       type="button"
@@ -205,6 +215,8 @@ function CardButton({
           onClick()
           event.currentTarget.blur()
       }}
+      onFocus={() => onCardHover(card)}
+      onBlur={() => onCardHover(null)}
     >
       <GameCard card={card} />
       {tradePlaced && <span className="trade-placed-badge">🔁 Đang đổi</span>}
@@ -295,6 +307,20 @@ export function GameBoard(props: GameBoardProps) {
   const drugHintParts = treatedDisorderName
     ? splitAroundValue(t('selectionHintDrug', { disorder: treatedDisorderName }), treatedDisorderName)
     : undefined
+  // Single derived node instead of four separate hint elements: the four
+  // conditions are mutually exclusive on selectedCard.cardType, and
+  // SelectionHint (rendered once, in .own-hand below) needs one child to
+  // anchor, not four stacked absolutely-positioned boxes.
+  const handSelectionHint =
+    selectedTreatment?.cardType === 'drug' && drugHintParts
+      ? <>{drugHintParts[0]}<strong>{treatedDisorderName}</strong>{drugHintParts[1]}</>
+      : selectedCard?.cardType === 'disorder'
+      ? t('selectionHintDisorder')
+      : selectedCard?.cardType === 'therapy'
+      ? t('selectionHintTherapy')
+      : selectedCard?.cardType === 'episode'
+      ? t('selectionHintEpisode')
+      : null
   const sortedHand = useMemo(() => {
     if (sortMode === 'original') return viewerHand
     return [...viewerHand].sort((a, b) =>
@@ -429,6 +455,7 @@ export function GameBoard(props: GameBoardProps) {
   }
 
   return (
+    <CardHoverProvider>
     <main
       className={`game-board ${isTargetingMode ? 'targeting-mode' : ''} ${isLocked ? 'interaction-locked' : ''} has-chat ${isChatCollapsed ? 'chat-collapsed' : ''}`}
       onClick={handleBackgroundClick}
@@ -555,34 +582,23 @@ export function GameBoard(props: GameBoardProps) {
 
       <section className="center-zone" id="center-table">
         <div className="deck-area">
-          {/* Hints render here, not inside .own-hand: .deck-area is the
-              actual card row, centred inside .center-zone's row 2 (the
-              minmax(var(--card-back-h), 1fr) track, layout.css) rather than
-              filling it — so the slack ABOVE .deck-area, not .center-zone's
-              own (much smaller) padding, is the real gap to the opponent
-              psyche row above. Anchoring an absolutely-positioned child to
-              .center-zone's own edge instead of here was tried first and
-              landed the hint flush against .psyche at some sizes (only
-              zone-pad's few px of slack was available, not the vertical-
-              centring slack) — anchoring to .deck-area gets the whole gap
-              without any viewport math, at every breakpoint. See hand.css
-              for the anchor itself. Moved together as a block so the trade
-              hint (in-progress feature, left untouched below) keeps
-              rendering with the rest. */}
-          {selectedTreatment?.cardType === 'drug' && drugHintParts && (
-            <div className="selection-hint">
-              {drugHintParts[0]}<strong>{treatedDisorderName}</strong>{drugHintParts[1]}
-            </div>
-          )}
-          {selectedCard?.cardType === 'disorder' && (
-            <div className="selection-hint">{t('selectionHintDisorder')}</div>
-          )}
-          {selectedCard?.cardType === 'therapy' && (
-            <div className="selection-hint">{t('selectionHintTherapy')}</div>
-          )}
-          {selectedCard?.cardType === 'episode' && (
-            <div className="selection-hint">{t('selectionHintEpisode')}</div>
-          )}
+          {/* The trade hint is the only .selection-hint variant left here.
+              It fires with NO card selected yet (it's asking the player to
+              pick one for the trade), so it has no card to anchor above and
+              keeps the original centring against .deck-area — .center-zone
+              sizes to minmax(var(--card-back-h), 1fr) and then CENTRES
+              .deck-area inside that box (flex, align-items/justify-content:
+              center), so `bottom: 100%` here lands on the slack that
+              centring leaves above .deck-area, not on .center-zone's own
+              much smaller padding. See layout.css's .deck-area comment and
+              hand.css's .selection-hint comment for the anchor itself.
+              The drug/disorder/therapy/episode hints moved out of this
+              block: <SelectionHint> is rendered below, inside .own-hand,
+              but portals its actual DOM node into document.body and
+              positions it with `position: fixed` (see SelectionHint.tsx),
+              since they always have a selected card in the hand to anchor
+              over instead and .own-hand's own overflow-x:auto would clip
+              anything positioned above it. */}
           {isAwaitingTradeCardPlacement && (
             <div className="selection-hint trade-hint">
               Chọn 1 lá trên tay để đưa vào giao dịch trao đổi
@@ -670,6 +686,9 @@ export function GameBoard(props: GameBoardProps) {
             className="hand own-hand"
             id="own-hand"
           >
+            {selectedCard && handSelectionHint !== null && (
+              <SelectionHint cardInstanceId={selectedCard.instanceId}>{handSelectionHint}</SelectionHint>
+            )}
             <div className="cards">
               {sortedHand.map((card) => (
                 <div id={`hand-card-${card.instanceId}`} key={card.instanceId}>
@@ -781,5 +800,6 @@ export function GameBoard(props: GameBoardProps) {
         </>
       )}
     </main>
+    </CardHoverProvider>
   )
 }

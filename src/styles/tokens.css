@@ -4,7 +4,13 @@
    ============================================================ */
 
 :root {
-  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  /* Only weight 600 is self-hosted (fonts.css) — the design is unified at
+     SemiBold. Without this, every font-weight: 700/800 rule elsewhere in
+     the codebase would make the browser synthesise a fake bold on top of
+     the 600 face, which looks bad on a serif. This makes those requests
+     render as the real 600 instead. */
+  font-synthesis-weight: none;
 
   /* Background */
   --bg-from:        #0f172a;
@@ -75,7 +81,7 @@
   --card-w-floor:   5rem;
   --card-w-cap:     min(9vw, 12.4vh);
   --card-w-ceiling: 13rem;
-  --card-ratio:   1.353;                              /* 11.5 / 8.5 — original card proportion */
+  --card-ratio:   1.5;                                /* 1536 / 1024 — the artwork templates in src/assets/ */
   --board-gap:    clamp(0.4rem, 1.1vh, 1rem);
   --zone-pad:     clamp(0.5rem, 1.4vh, 1rem);
   --zone-chrome:  clamp(3rem, 7vh, 5.5rem);           /* badges, nameplate, avatar bar */

@@ -10,7 +10,7 @@ interface HomeScreenProps {
 export function HomeScreen({ onLocal, onOnline }: HomeScreenProps) {
   return (
     <main className="setup-screen">
-      <section className="panel home-screen">
+      <section className="panel home-screen panel-surface panel-surface--framed">
         {/* The logo art already spells out "SIDE EFFECTS", so it stands in
             for the visible title. The h1 stays in the DOM — hidden from
             sighted users, exposed to screen readers and search engines —

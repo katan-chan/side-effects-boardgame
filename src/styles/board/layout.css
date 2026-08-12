@@ -39,9 +39,6 @@
   --hand-gap:     clamp(0.3rem, calc(var(--card-w) * 0.08), 1rem);
   --card-back-w:  calc(var(--card-w) * 0.82);
   --card-back-h:  calc(var(--card-back-w) * 1.4);
-  --card-title-fs:   max(0.6rem, calc(var(--card-w) * 0.092));
-  --card-summary-fs: max(0.53rem, calc(var(--card-w) * 0.075));
-  --card-micro-fs:   max(0.46rem, calc(var(--card-w) * 0.064));
   /* Opponent's face-down hand (opponent-hand.css) — that file's own :root
      default (declared before this refactor, out of scope to edit here) reads
      var(--card-w) too, and :root can no longer see it, so it would resolve
@@ -134,15 +131,102 @@
       (var(--board-avail-w) - (var(--slot-count, 4) - 1) * var(--board-gap))
       / (1.45 * var(--slot-count, 4))
     );
-    /* The knob: smallest of the height/viewport cap and both rows' fits,
+    /* ── Vertical fit: what --card-w-cap's flat vh term (tokens.css) forgot ──
+       Measured with a real browser (getBoundingClientRect) at 1920x1080: going
+       from 2 players (no avatar bar, OpponentAvatarBar only renders once
+       GameBoard.tsx's `opponents.length > 1`) to 3+ players (bar renders)
+       shifted .psyche's top in .opponent-zone down 66px while its own height
+       stayed put (234px both times) — the bar's real footprint — but
+       .deck-area's top only moved down 28px, a 38px shortfall, and
+       .psyche/.deck-area then measured overlapping by that same ~39px at
+       1920x1080 (44px at 1873x938, 30px at 1366x768: worse on shorter/narrower
+       screens, better on taller/wider ones — a vertical-budget problem, not a
+       fixed number of px). Root cause: this file's three grid rows are `auto /
+       minmax(var(--card-back-h), 1fr) / auto` (below) — row 2's minimum is a
+       hard floor the track-sizing algorithm honours before anything else, so
+       once the avatar bar makes .opponent-zone's (row 1) content taller than
+       the row's remaining share, row 1's OWN track undershoots that content
+       (`min-height: 0` + `overflow: hidden` there let the track shrink below
+       it instead of the reverse) while .center-zone (row 2) keeps painting
+       its un-clipped deck at its full, unshrunk card-back-h — hence the
+       visual overlap sits at the row 1/row 2 boundary, not inside either
+       zone's own layout. --card-w-cap (tokens.css) has always been a flat
+       `min(9vw, 12.4vh)` guess at how much vertical room three stacked rows
+       leave per unit of card width; it has no term for --zone-chrome (the
+       token already named for exactly this — "badges, nameplate, avatar bar"
+       — but never wired into any formula before now), so it stayed the same
+       size whether or not the bar was actually there. This fixes that: solve
+       for the card-w at which the FULL worst-case vertical demand (avatar bar
+       present — the fit can't see live player count, so it always budgets for
+       it, same as 3-player and 8-player render identically once the bar
+       exists) equals the board's own height (100vh; .game-board sets height:
+       100dvh at this breakpoint, online mode's connection-status bar aside —
+       same simplification --card-w-cap already made).
+         demand = 2×(2×zone-pad + zone-chrome) [opponent-zone + self-zone
+                    padding+chrome, one avatar-bar-or-hud-glass allowance each]
+                  + 3×board-gap [opponent-zone's avatar-bar↔player gap, plus
+                    self-zone's hud-glass↔player and player↔hand-and-controls
+                    gaps]
+                  + 3×card-h [opponent psyche row + self psyche row + own-hand
+                    row, all one card-height tall]
+                  + card-back-h [deck row, card-w×0.82×1.4 — same literals as
+                    --card-back-w/--card-back-h below, inlined here because
+                    those two vars are themselves derived FROM --card-w and
+                    can't feed back into one of --card-w's own inputs]
+       Solving demand = 100vh for card-w: */
+    /* ADDENDUM — this formula still left a real, if small, shortfall: a
+       fresh getBoundingClientRect() pass at 1920x1080/8p after the fix
+       above measured .opponent-zone's own box ending at 463.14px while its
+       child `.player` laid out to 470.88px — a 7.7px overlap, silently
+       absorbed by .opponent-zone's `overflow: hidden` (a cropped
+       screenshot confirmed no visible clipping or artifact at that size,
+       but the assertion this fix exists to satisfy — rect overlap <= 0 —
+       can't rely on that; it gets worse on shorter/narrower screens the
+       same way the original 39px did). Root cause: the demand model above
+       treats the opponent psyche row as exactly one card-height and never
+       accounts for two things that are ALWAYS in `.player` alongside it:
+         1. The watched opponent's face-down hand (.opponent-hand,
+            opponent-hand.css) — unconditionally rendered whenever a
+            focused opponent exists (GameBoard.tsx; unlike the avatar bar
+            it is NOT gated behind opponents.length), stacked ABOVE the
+            psyche row inside the same `.player` grid (both grid-column: 2,
+            auto-placed into separate rows — confirmed by measuring
+            `.opponent-hand` at 144.625px against a probed --facedown-h of
+            the same value, at card-w=133.906). Cost: --facedown-h
+            (card-w×0.72×card-ratio) + its own margin-bottom (0.75×
+            board-gap, opponent-hand.css) + one more `.player` row-gap
+            (board-gap) to the psyche row below it.
+         2. `.slot-badge` (psyche.css) sits ABOVE the card inside each slot,
+            so a psyche row's real height is card-h PLUS the badge's own
+            box. Measured at card-w=133.906: a slot's total height
+            (223.703) minus card-h (200.859) = 22.84px of badge, which
+            decomposes into margin-bottom (0.25×board-gap, psyche.css,
+            post-shrink), padding (2×0.14rem = 4.48px flat — rem is
+            root-relative, not card-w-relative), a 1px top+bottom border
+            (2px — both `.treated`/`.untreated` set `border: 1px solid`),
+            and the badge's own line-height. Line-height can't be inlined
+            as a card-w multiple — the SAME var(--card-w) circularity the
+            comment above already flags for --card-back-h applies here, and
+            the badge's font-size is `max(0.8125rem, card-w×0.1)` — but it
+            CAN safely reference var(--card-w-cap) (tokens.css; depends on
+            nothing this file computes, so never circular) as a stand-in
+            upper bound for the eventual card-w, giving LH below. Two
+            badges count (opponent + self psyche rows); --own-hand has
+            none. Re-solving demand = 100vh with both terms added: */
+    --card-w-fit-height: calc(
+      (100vh - 4 * var(--zone-pad) - 2 * var(--zone-chrome) - 5.25 * var(--board-gap)
+        - 12.96px - 2 * max(0.8125rem, calc(var(--card-w-cap) * 0.1)))
+      / (3 * var(--card-ratio) + 0.82 * 1.4 + 0.72 * var(--card-ratio))
+    );
+    /* The knob: smallest of the viewport/height cap and all three rows' fits,
        never below the legibility floor, never above the flat ceiling. If the
        floor wins here, a row's own fit could still be smaller than the
-       floor it was just clamped up to — that row is then wider than its
-       track and must scroll (its own overflow-x:auto), not wrap: see
+       floor it was just clamped up to — that row is then wider (or taller)
+       than its track and must scroll (its own overflow-x:auto), not wrap: see
        .psyche/.own-hand for the fallback each row degrades to. */
     --card-w: clamp(
       var(--card-w-floor),
-      min(var(--card-w-cap), var(--card-w-fit-hand), var(--card-w-fit-psyche)),
+      min(var(--card-w-cap), var(--card-w-fit-hand), var(--card-w-fit-psyche), var(--card-w-fit-height)),
       var(--card-w-ceiling)
     );
   }
@@ -316,14 +400,15 @@
   justify-content: center;
   align-items: center;
   perspective: 1000px;
-  /* Containing block for .selection-hint (hand.css) — it needs to measure the
-     slack .center-zone's vertical centring leaves ABOVE the actual card row,
-     not .center-zone's own (much smaller) padding. See GameBoard.tsx's
-     comment at the hint's render site for why .center-zone itself isn't the
-     anchor. The hint is absolutely positioned, so this doesn't change
-     .draw-pile/.discard-pile's own layout or hover transforms — they aren't
-     positioned and don't participate in a containing-block relationship
-     with it. */
+  /* Containing block for the trade hint only now (.selection-hint.trade-hint,
+     GameBoard.tsx) — the drug/disorder/therapy/episode hints moved to
+     .own-hand (hand.css's .hand-selection-hint) since they anchor to the
+     selected card, not the deck. The trade hint still needs this: it shows
+     with no card selected, so .deck-area's centred position is still the
+     only sensible anchor for it. The hint is absolutely positioned, so this
+     doesn't change .draw-pile/.discard-pile's own layout or hover
+     transforms — they aren't positioned and don't participate in a
+     containing-block relationship with it. */
   position: relative;
 }
 .draw-pile {
